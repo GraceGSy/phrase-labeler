@@ -1,0 +1,12 @@
+LICENSE
+MANIFEST.in
+README.md
+setup.py
+phrase_labeler/__init__.py
+phrase_labeler/phrase_labeler.py
+phrase_labeler.egg-info/PKG-INFO
+phrase_labeler.egg-info/SOURCES.txt
+phrase_labeler.egg-info/dependency_links.txt
+phrase_labeler.egg-info/entry_points.txt
+phrase_labeler.egg-info/requires.txt
+phrase_labeler.egg-info/top_level.txt

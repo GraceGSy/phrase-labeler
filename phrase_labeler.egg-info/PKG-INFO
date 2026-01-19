@@ -1,0 +1,42 @@
+Metadata-Version: 2.4
+Name: phrase-labeler
+Version: 0.1.2
+Summary: A package to label sentence segments given predefined segment labels using OpenAI API
+Home-page: https://github.com/ZiweiGu/GP-TSM
+Author: Ziwei Gu
+Author-email: ziweigu@g.harvard.edu
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: openai
+Dynamic: author
+Dynamic: author-email
+Dynamic: classifier
+Dynamic: description
+Dynamic: description-content-type
+Dynamic: home-page
+Dynamic: license-file
+Dynamic: requires-dist
+Dynamic: summary
+
+# Phrase Labeler
+
+A Python package that labels sentence segments given predefined segment labels using OpenAI API
+
+## Installation
+
+To install this package, run:
+
+```bash
+pip install phrase-labeler
+```
+
+## Command-Line Usage
+
+After installation, you can use the label-phrase command to label sentence segments. The syntax is as follows:
+
+```bash
+label-phrase "[sentent segments as a JSON list]" "[your-openai-api-key]" "[path to json file that contains a list of predefined labels]"
+```
