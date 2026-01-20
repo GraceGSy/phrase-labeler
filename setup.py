@@ -11,7 +11,7 @@ setup(
     ],
     entry_points={
         'console_scripts': [
-            'label-phrase=phrase_labeler.phrase_labeler:main',
+            'label-phrase=phrase_labeler.cli:main',
         ],
     },
     include_package_data=True,

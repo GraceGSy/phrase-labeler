@@ -1,0 +1,7 @@
+A sentence (from a paper abstract) was splitted into several segments, put into the following list. For each list element, please classify it into one of the ${category_count} categories below, based on what it describes.
+${sentence}
+
+Categories:
+${categories}
+
+Please return a python list of the Category numbers only. The length of that list must be the same as that of the input list. If the task is impossible, return an empty list.
