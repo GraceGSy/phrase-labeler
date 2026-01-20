@@ -15,5 +15,7 @@ pip install phrase-labeler
 After installation, you can use the label-phrase command to label sentence segments. The syntax is as follows:
 
 ```bash
-label-phrase "[sentent segments as a JSON list]" "[your-openai-api-key]" "[path to json file that contains a list of predefined labels]"
+label-phrase "[sentence segments as a JSON list]" "[your-openai-api-key]" [path-to-categories.json] [--extend-categories]
 ```
+
+If you omit the categories file, the default 0-8 categories are used. If you provide a categories file, it must be a JSON list of strings (see `phrase_labeler/example.json`). Use `--extend-categories` to append your categories to the defaults instead of replacing them.
