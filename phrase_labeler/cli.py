@@ -2,7 +2,7 @@ import argparse
 import ast
 import json
 import os
-from typing import Optional
+from typing import Dict, Optional
 
 import openai
 
@@ -23,6 +23,83 @@ def _load_prompt_template(prompt_file: Optional[str]) -> str:
         return handle.read()
 
 
+def _normalize_label_map(raw_labels: Dict) -> Dict[int, str]:
+    """Normalize a label map with numeric keys into {int: str}."""
+    if not isinstance(raw_labels, dict):
+        raise ValueError("Labels must be a JSON object mapping numeric keys to strings.")
+    normalized = {}
+    for key, value in raw_labels.items():
+        if isinstance(key, int):
+            idx = key
+        elif isinstance(key, str) and key.isdigit():
+            idx = int(key)
+        else:
+            raise ValueError("Category label keys must be non-negative integers.")
+        if idx < 0:
+            raise ValueError("Category label keys must be non-negative integers.")
+        if not isinstance(value, str):
+            raise ValueError("Category labels must be strings.")
+        normalized[idx] = value
+    return normalized
+
+
+def _labels_from_map(label_map: Dict[int, str], require_contiguous: bool) -> list[str]:
+    """Return label values ordered by numeric key, with optional contiguous validation."""
+    if not label_map:
+        return []
+    keys_sorted = sorted(label_map.keys())
+    if require_contiguous:
+        expected = list(range(len(keys_sorted)))
+        if keys_sorted != expected:
+            raise ValueError("Category label keys must be contiguous starting at 0.")
+    return [label_map[idx] for idx in keys_sorted]
+
+
+def _parse_categories_payload(payload) -> Dict[int, str]:
+    """Parse category JSON into a label map."""
+    if isinstance(payload, list):
+        if not all(isinstance(c, str) for c in payload):
+            raise ValueError("The categories list must contain strings only.")
+        return {i: c for i, c in enumerate(payload)}
+
+    if isinstance(payload, dict):
+        if "labels" in payload:
+            raw_labels = payload["labels"]
+        else:
+            raw_labels = payload
+        return _normalize_label_map(raw_labels)
+
+    raise ValueError("The categories file must contain a JSON list or an object mapping numeric keys to labels.")
+
+
+def _merge_categories(defaults: list[str], label_map: Dict[int, str], use_defaults: bool, override: bool) -> list[str]:
+    """Merge user categories with defaults based on flags."""
+    if override:
+        categories = list(defaults)
+        for idx, label in label_map.items():
+            if idx >= len(categories):
+                raise ValueError("Override label index out of range for default categories.")
+            categories[idx] = label
+        return categories
+    if use_defaults:
+        return list(defaults) + _labels_from_map(label_map, require_contiguous=False)
+    return _labels_from_map(label_map, require_contiguous=True)
+
+
+def _load_categories(categories_file: Optional[str], use_defaults: bool, override: bool) -> list[str]:
+    """Load categories from disk and merge with defaults based on flags."""
+    if not categories_file:
+        return DEFAULT_CATEGORIES
+    if not os.path.exists(categories_file):
+        raise FileNotFoundError(f"File not found: {categories_file}")
+    with open(categories_file, "r", encoding="utf-8") as handle:
+        payload = json.load(handle)
+    label_map = _parse_categories_payload(payload)
+    if override:
+        use_defaults = True
+    return _merge_categories(DEFAULT_CATEGORIES, label_map, use_defaults, override)
+
+
 def find_labels(segmented_sent, k, categories, prompt_template=None):
     """Classify each segment and print a labeled list to stdout."""
     output = []
@@ -40,7 +117,6 @@ def find_labels(segmented_sent, k, categories, prompt_template=None):
         for j, segment in enumerate(segmented_sent):
             output.append({'text': segment, 'label': color_list[j]})
     else:
-        buggy_case_counter += 1
         print(segmented_sent)
         print(color_list)
         for j, segment in enumerate(segmented_sent):
@@ -56,26 +132,20 @@ def main():
     parser.add_argument("api_key", help="Your OpenAI API key")
     parser.add_argument("categories_file", type=str, nargs="?",
                         help="Optional path to JSON file containing a category list")
-    parser.add_argument("--extend-categories", action="store_true",
-                        help="Append categories_file to the default categories")
+    parser.add_argument("--use-defaults", action=argparse.BooleanOptionalAction, default=True,
+                        help="Include default categories before your custom labels (default: true).")
+    parser.add_argument("--override-defaults", action="store_true",
+                        help="Replace default labels at the provided indices.")
     parser.add_argument("--prompt-file", type=str,
                         help="Optional path to a prompt template file")
 
     args = parser.parse_args()
 
-    # Load categories from file or use default
-    categories = DEFAULT_CATEGORIES
-    if args.categories_file:
-        if not os.path.exists(args.categories_file):
-            raise FileNotFoundError(f"File not found: {args.categories_file}")
-        with open(args.categories_file, "r") as f:
-            user_categories = json.load(f)
-        if not isinstance(user_categories, list) or not all(isinstance(c, str) for c in user_categories):
-            raise ValueError("The categories file must contain a JSON list of strings.")
-        if args.extend_categories:
-            categories = DEFAULT_CATEGORIES + user_categories
-        else:
-            categories = user_categories
+    categories = _load_categories(
+        args.categories_file,
+        use_defaults=args.use_defaults,
+        override=args.override_defaults,
+    )
 
     prompt_template = _load_prompt_template(args.prompt_file)
     find_labels(args.sentence, args.api_key, categories, prompt_template)

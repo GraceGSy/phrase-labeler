@@ -15,10 +15,31 @@ pip install phrase-labeler
 After installation, you can use the label-phrase command to label sentence segments. The syntax is as follows:
 
 ```bash
-label-phrase "[sentence segments as a JSON list]" "[your-openai-api-key]" [path-to-categories.json] [--extend-categories] [--prompt-file path-to-prompt.txt]
+label-phrase "[sentence segments as a JSON list]" "[your-openai-api-key]" [path-to-categories.json] [--use-defaults|--no-use-defaults] [--override-defaults] [--prompt-file path-to-prompt.txt]
 ```
 
-If you omit the categories file, the default 0-8 categories are used. If you provide a categories file, it must be a JSON list of strings (see `categories/default.json` or `phrase_labeler/example.json`). Use `--extend-categories` to append your categories to the defaults instead of replacing them.
+If you omit the categories file, the default 0-8 categories are used. If you provide a categories file, it can be a JSON object that maps numeric keys to labels:
+
+```json
+{
+  "labels": {
+    "0": "stakeholders",
+    "1": "setting",
+    "2": "goal",
+    "3": "obstacle",
+    "4": "constraints"
+  }
+}
+```
+
+By default, custom categories are appended after the defaults. Use `--override-defaults` to replace the corresponding default labels for the numeric keys you supply, or `--no-use-defaults` to use only the provided labels.
+
+Example behaviors with defaults `[A, B, C]` and a file `{0: X, 2: Z}`:
+```
+--use-defaults (default) -> [A, B, C, X, Z]
+--no-use-defaults        -> [X, Z]   # requires contiguous keys from 0
+--override-defaults      -> [X, B, Z]
+```
 
 If you provide `--prompt-file`, it should be a text file that uses `${sentence}`, `${categories}`, and optionally `${category_count}` placeholders. See `prompts/default.txt` for the default template.
 

@@ -116,13 +116,13 @@ class CLITests(unittest.TestCase):
     """Tests for CLI argument handling."""
 
     def test_main_uses_custom_categories_file(self):
-        """Use the supplied categories file when present."""
+        """Use the supplied categories file when append is disabled."""
         with tempfile.TemporaryDirectory() as tmpdir:
             path = os.path.join(tmpdir, "cats.json")
             with open(path, "w") as handle:
-                json.dump(["A", "B"], handle)
+                json.dump({"labels": {"0": "A", "1": "B"}}, handle)
 
-            argv = ["label-phrase", '["seg"]', "test-key", path]
+            argv = ["label-phrase", '["seg"]', "test-key", path, "--no-use-defaults"]
             with mock.patch.object(sys, "argv", argv):
                 with mock.patch.object(cli, "find_labels") as mock_find:
                     cli.main()
@@ -134,14 +134,14 @@ class CLITests(unittest.TestCase):
             self.assertEqual(called_categories, ["A", "B"])
             self.assertEqual(called_prompt, prompting.DEFAULT_PROMPT_TEMPLATE)
 
-    def test_main_extends_default_categories(self):
-        """Append user categories when --extend-categories is set."""
+    def test_main_appends_categories_by_default(self):
+        """Append user categories when no flags are provided."""
         with tempfile.TemporaryDirectory() as tmpdir:
             path = os.path.join(tmpdir, "cats.json")
             with open(path, "w") as handle:
-                json.dump(["Extra"], handle)
+                json.dump({"labels": {"0": "Extra"}}, handle)
 
-            argv = ["label-phrase", '["seg"]', "test-key", path, "--extend-categories"]
+            argv = ["label-phrase", '["seg"]', "test-key", path]
             with mock.patch.object(sys, "argv", argv):
                 with mock.patch.object(cli, "find_labels") as mock_find:
                     cli.main()
@@ -150,17 +150,35 @@ class CLITests(unittest.TestCase):
             called_categories = mock_find.call_args[0][2]
             self.assertEqual(called_categories, prompting.DEFAULT_CATEGORIES + ["Extra"])
 
+    def test_main_overrides_default_categories(self):
+        """Override default categories when override is enabled."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = os.path.join(tmpdir, "cats.json")
+            with open(path, "w") as handle:
+                json.dump({"labels": {"1": "Override"}}, handle)
+
+            argv = ["label-phrase", '["seg"]', "test-key", path, "--override-defaults"]
+            with mock.patch.object(sys, "argv", argv):
+                with mock.patch.object(cli, "find_labels") as mock_find:
+                    cli.main()
+
+            mock_find.assert_called_once()
+            called_categories = mock_find.call_args[0][2]
+            expected = list(prompting.DEFAULT_CATEGORIES)
+            expected[1] = "Override"
+            self.assertEqual(called_categories, expected)
+
     def test_main_uses_prompt_file(self):
         """Load the prompt template from the provided file."""
         with tempfile.TemporaryDirectory() as tmpdir:
             cats_path = os.path.join(tmpdir, "cats.json")
             prompt_path = os.path.join(tmpdir, "prompt.txt")
             with open(cats_path, "w") as handle:
-                json.dump(["A"], handle)
+                json.dump({"labels": {"0": "A"}}, handle)
             with open(prompt_path, "w") as handle:
                 handle.write("Prompt: ${sentence}\n${categories}")
 
-            argv = ["label-phrase", '["seg"]', "test-key", cats_path, "--prompt-file", prompt_path]
+            argv = ["label-phrase", '["seg"]', "test-key", cats_path, "--no-use-defaults", "--prompt-file", prompt_path]
             with mock.patch.object(sys, "argv", argv):
                 with mock.patch.object(cli, "find_labels") as mock_find:
                     cli.main()

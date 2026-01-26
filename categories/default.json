@@ -1,11 +1,13 @@
-[
-  "Status Quo/Context (the particular context or existing work)",
-  "Challenge/Problem/Obstacle (often starts with 'however', gaps in prior work)",
-  "Contribution (what the authors did)",
-  "Purpose/Goal/Focus (why the work was done)",
-  "Methodology (how the work was done)",
-  "Participants (who were involved)",
-  "System Description (of a system the authors developed or proposed)",
-  "Findings",
-  "Example"
-]
+{
+  "labels": {
+    "0": "Status Quo/Context (the particular context or existing work)",
+    "1": "Challenge/Problem/Obstacle (often starts with 'however', gaps in prior work)",
+    "2": "Contribution (what the authors did)",
+    "3": "Purpose/Goal/Focus (why the work was done)",
+    "4": "Methodology (how the work was done)",
+    "5": "Participants (who were involved)",
+    "6": "System Description (of a system the authors developed or proposed)",
+    "7": "Findings",
+    "8": "Example"
+  }
+}

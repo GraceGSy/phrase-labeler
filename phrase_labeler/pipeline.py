@@ -14,14 +14,13 @@ def to_serializable(obj):
     """Recursively convert OpenAI SDK response to a JSON-serializable format."""
     if isinstance(obj, dict):
         return {k: to_serializable(v) for k, v in obj.items()}
-    elif isinstance(obj, list):
+    if isinstance(obj, list):
         return [to_serializable(i) for i in obj]
-    elif hasattr(obj, "to_dict"):
+    if hasattr(obj, "to_dict"):
         return to_serializable(obj.to_dict())
-    elif hasattr(obj, "model_dump"):
+    if hasattr(obj, "model_dump"):
         return to_serializable(obj.model_dump())
-    else:
-        return obj  # base case
+    return obj  # base case
 
 
 """Supported LLM coding assistants."""
@@ -32,7 +31,7 @@ class LLM(Enum):
 def call_chatgpt(prompt: str, n: int = 1, temperature: float = 1.0) -> Tuple[Dict, Dict]:
     """Send a prompt to the ChatGPT API and return the query and response objects."""
     query = {
-        "model": "gpt-3.5-turbo",
+        "model": "gpt-3.5-turbo", #TODO: Change model
         "messages": [
             {"role": "system", "content": "You are a helpful assistant."},
             {"role": "user", "content": prompt},
@@ -55,7 +54,7 @@ def _extract_chatgpt_responses(response: dict) -> List[dict]:
     choices = response['response'].choices
     return [
         c.message.content
-        for i, c in enumerate(choices)
+        for c in choices
     ]
 
 
@@ -74,16 +73,15 @@ def is_valid_filepath(filepath: str) -> bool:
     """Check that a file can be opened or created for caching responses."""
     try:
         with open(filepath, 'r'):
-            pass
+            return True
     except IOError:
         try:
             # Create the file if it doesn't exist, and write an empty json string to it
-            with open(filepath, 'w+') as f:
+            with open(filepath, 'w+', encoding="utf-8") as f:
                 f.write("{}")
-                pass
+            return True
         except IOError:
             return False
-    return True
 
 
 def is_valid_json(json_dict: dict) -> bool:
@@ -92,8 +90,8 @@ def is_valid_json(json_dict: dict) -> bool:
         try:
             json.dumps(json_dict)
             return True
-        except:
-            pass
+        except (TypeError, ValueError):
+            return False
     return False
 
 
