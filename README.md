@@ -41,6 +41,17 @@ Example behaviors with defaults `[A, B, C]` and a file `{0: X, 2: Z}`:
 --override-defaults      -> [X, B, Z]
 ```
 
+## Evaluation Harness
+
+Use the standalone harness to evaluate prompts/models against a labeled dataset.
+
+Example:
+```bash
+python scripts/run_eval.py --config eval_config.example.json --api-key YOUR_KEY
+```
+
+The harness writes JSONL results and a summary JSON into `eval_runs/` with a timestamped filename. The config file lets you vary prompts, models, temperatures, and label sets.
+
 If you provide `--prompt-file`, it should be a text file that uses `${sentence}`, `${categories}`, and optionally `${category_count}` placeholders. See `prompts/default.txt` for the default template.
 
 ## Module Layout

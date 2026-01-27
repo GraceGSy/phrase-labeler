@@ -1,0 +1,35 @@
+{
+  "dataset_path": "tests/data.json",
+  "output_dir": "eval_runs",
+  "match_mode": "exact",
+  "use_defaults": false,
+  "override_defaults": false,
+  "label_sets": {
+    "need-thesis": {
+      "path": "categories/need.json",
+      "use_defaults": false
+    },
+    "approach-thesis": {
+      "path": "categories/approach.json",
+      "use_defaults": false
+    },
+    "novelty-thesis": {
+      "path": "categories/novelty.json",
+      "use_defaults": false
+    }
+  },
+  "prompt_sets": [
+    {
+      "name": "default",
+      "path": "prompts/default.txt"
+    }
+  ],
+  "models": [
+    {
+      "name": "gpt-3.5-turbo",
+      "model": "gpt-3.5-turbo",
+      "temperature": 0.2,
+      "n": 1
+    }
+  ]
+}

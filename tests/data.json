@@ -1,0 +1,390 @@
+{
+  "need-1": {
+    "id": "need-1",
+    "typeId": "need-thesis",
+    "text": "Users often struggle with visualization editing because GUIs overwhelm them with too many options or restrict them with too few.",
+    "segments": {
+      "Users": 0,
+      "often struggle": 3,
+      "with visualization editing": 2,
+      "because GUIs overwhelm them with too many options or restrict them with too few": 3
+    }
+  },
+  "need-2": {
+    "id": "need-2",
+    "typeId": "need-thesis",
+    "text": "Many people find GUIs either too complex or too limited when editing visualizations, which hinders creative exploration.",
+    "segments": {
+      "Many people": 0,
+      "when editing visualizations": 2,
+      "find GUIs either too complex or too limited": 3,
+      "which hinders creative exploration": 3
+    }
+  },
+  "need-3": {
+    "id": "need-3",
+    "typeId": "need-thesis",
+    "text": "Because visualization editing involves navigating a vast option space, GUIs frequently lead to frustration and inefficiency.",
+    "segments": {
+      "Because visualization editing involves navigating a vast option space": 4,
+      "GUIs frequently lead to frustration and inefficiency": 3
+    }
+  },
+  "need-4": {
+    "id": "need-4",
+    "typeId": "need-thesis",
+    "text": "Users are often stuck choosing between GUI systems that are overwhelming and those that are too constrained.",
+    "segments": {
+      "Users": 0,
+      "are often stuck choosing between GUI systems that are overwhelming and those that are too constrained": 3
+    }
+  },
+  "need-5": {
+    "id": "need-5",
+    "typeId": "need-thesis",
+    "text": "Professionals, particularly working within large enterprises, who are inundated with large amounts of data and visual information when critically processing large dataset, often feel overwhelmed and required editing tools, but most of these tools are complex and require tailored visual interfaces.",
+    "segments": {
+      "Professionals, particularly working within large enterprises": 0,
+      "who are inundated with large amounts of data and visual information": 1,
+      "when critically processing large dataset": 2,
+      "often feel overwhelmed and required editing tools": 3,
+      "but most of these tools are complex and require tailored visual interfaces": 4
+    }
+  },
+  "need-6": {
+    "id": "need-6",
+    "typeId": "need-thesis",
+    "text": "When editing visualizations users face difficulty in navigating complex GUIs or are limited by overly tailored interfaces.",
+    "segments": {
+      "When editing visualizations": 2,
+      "users": 0,
+      "face difficulty in navigating complex GUIs or are limited by overly tailored interfaces": 3
+    }
+  },
+  "need-7": {
+    "id": "need-7",
+    "typeId": "need-thesis",
+    "text": "Visualization editing tools often fail to support iterative changes, leaving users uncertain about outcomes.",
+    "segments": {
+      "Visualization editing tools often fail to support iterative changes": 4,
+      "leaving users uncertain about outcomes": 3
+    }
+  },
+  "need-8": {
+    "id": "need-8",
+    "typeId": "need-thesis",
+    "text": "When editing visualizations, users either drown in GUI complexity or feel constrained by overly tailored interfaces.",
+    "segments": {
+      "When editing visualizations": 1,
+      "users": 0,
+      "either drown in GUI complexity or feel constrained by overly tailored interfaces": 3
+    }
+  },
+  "need-9": {
+    "id": "need-9",
+    "typeId": "need-thesis",
+    "text": "The difficulty of editing visualizations stems from an imbalance between freedom and usability in interface design.",
+    "segments": {
+      "The difficulty": 3,
+      "of editing visualizations": 2,
+      "stems from an imbalance between freedom and usability in interface design": 4
+    }
+  },
+  "need-10": {
+    "id": "need-10",
+    "typeId": "need-thesis",
+    "text": "Traditional GUIs and pure NLIs both fail to fully support flexible, user-friendly editing of visualizations.",
+    "segments": {
+      "Traditional GUIs and pure NLIs both fail to fully support flexible, user-friendly editing of visualizations": 4
+    }
+  },
+  "need-11": {
+    "id": "need-11",
+    "typeId": "need-thesis",
+    "text": "Natural language interfaces provide a simpler way to request edits, but they remove the advantages of GUI exploration and feedback.",
+    "segments": {
+      "Natural language interfaces provide a simpler way to request edits": 1,
+      "but they remove the advantages of GUI exploration and feedback": 4
+    }
+  },
+  "need-12": {
+    "id": "need-12",
+    "typeId": "need-thesis",
+    "text": "In the design of visualization creation tools, there is an inherent tradeoff between complex UIs that may overwhelm the user and simple UIs that may constrain the user.",
+    "segments": {
+      "In the design of visualization creation tools": 1,
+      "there is an inherent tradeoff between complex UIs that may overwhelm the user and simple UIs that may constrain the user.": 4
+    }
+  },
+  "need-13": {
+    "id": "need-13",
+    "typeId": "need-thesis",
+    "text": "When creating and editing visualizations, users may find it hard to work with GUIs, but using alternative NLIs also has disadvantages because users cannot explore edits and get instant feedback.",
+    "segments": {
+      "When creating and editing visualizations": 1,
+      "users": 0,
+      "may find it hard to work with GUIs": 3,
+      "but using alternative NLIs also has disadvantages": 4,
+      "because users cannot explore edits and get instant feedback": 3
+    }
+  },
+  "need-14": {
+    "id": "need-14",
+    "typeId": "need-thesis",
+    "text": "Because of support for iterative changes (or lack thereof), users' discontent with GUIs stems from a wide range of options and an imbalance between complete customization ability or a more static interface.",
+    "segments": {
+      "Because of support for iterative changes (or lack thereof)": 4,
+      "users' discontent with GUIs": 3,
+      "stems from a wide range of options and an imbalance between complete customization ability or a more static interface": 4
+    }
+  },
+  "need-15": {
+    "id": "need-15",
+    "typeId": "need-thesis",
+    "text": "People editing visualizations need both flexibility and feedback, yet current interfaces force them to compromise between GUI complexity and NLI simplicity.",
+    "segments": {
+      "People editing visualizations": 0,
+      "need both flexibility and feedback": 2,
+      "yet current interfaces force them to compromise between GUI complexity and NLI simplicity": 3
+    }
+  },
+  "need-16": {
+    "id": "need-16",
+    "typeId": "need-thesis",
+    "text": "Existing visualization tools can be either overwhelming or too complicated to use.",
+    "segments": {
+      "Existing visualization tools can be either overwhelming or too complicated to use": 4
+    }
+  },
+  "approach-1": {
+    "id": "approach-1",
+    "typeId": "approach-thesis",
+    "text": "DynaVis addresses this challenge by blending natural language input with dynamically generated widgets that allow users to refine edits.",
+    "segments": {
+      "DynaVis": 0,
+      "addresses this challenge": 2,
+      "by blending natural language input with dynamically generated widgets": 1,
+      "that allow users to refine edits": 3
+    }
+  },
+  "approach-2": {
+    "id": "approach-2",
+    "typeId": "approach-thesis",
+    "text": "The authors propose DynaVis, a system that performs edits based on natural language while also creating persistent UI elements for ongoing adjustment.",
+    "segments": {
+      "The authors propose DynaVis, a system": 0,
+      "that performs edits based on natural language while also creating persistent UI elements": 1,
+      "for ongoing adjustment": 3
+    }
+  },
+  "approach-3": {
+    "id": "approach-3",
+    "typeId": "approach-thesis",
+    "text": "DynaVis solves this by allowing natural language to specify edits and then synthesizing interactive widgets that let users explore variations.",
+    "segments": {
+      "DynaVis": 0,
+      "solves this": 2,
+      "by allowing natural language to specify edits": 1,
+      "and then synthesizing interactive widgets": 1,
+      "that let users explore variations": 3
+    }
+  },
+  "approach-4": {
+    "id": "approach-4",
+    "typeId": "approach-thesis",
+    "text": "The proposed DynaVIs combines both a GUI interface and NLIs to allow the user to interact with dynamic and expressive widgets, therefore streamlining visualization edits.",
+    "segments": {
+      "The proposed DynaVIs": 0,
+      "combines both a GUI interface and NLIs": 1,
+      "to allow the user to interact with dynamic and expressive widgets": 3,
+      "therefore streamlining visualization edits": 2
+    }
+  },
+  "approach-5": {
+    "id": "approach-5",
+    "typeId": "approach-thesis",
+    "text": "This problem is thus mitigated by the interactive widget and natural language capabilities of DynaVis.",
+    "segments": {
+      "This problem is thus mitigated": 2,
+      "by the interactive widget and natural language capabilities": 1,
+      "of DynaVis": 0
+    }
+  },
+  "approach-6": {
+    "id": "approach-6",
+    "typeId": "approach-thesis",
+    "text": "DynaVis provides a natural language interface to make this easier for the user to not directly deal with the complexity of the visualization tool.",
+    "segments": {
+      "DynaVis": 0,
+      "provides a natural language interface": 1,
+      "to make this easier for the user": 2,
+      "to not directly deal with the complexity of the visualization tool": 2
+    }
+  },
+  "approach-7": {
+    "id": "approach-7",
+    "typeId": "approach-thesis",
+    "text": "DynaVis counters this problem by executing natural language edits while generating persistent controls that support further modifications with visual feedback.",
+    "segments": {
+      "DynaVis": 0,
+      "counters this problem": 2,
+      "by executing natural language edits": 1,
+      "while generating persistent controls": 1,
+      "that support further modifications with visual feedback": 3
+    }
+  },
+  "approach-8": {
+    "id": "approach-8",
+    "typeId": "approach-thesis",
+    "text": "DynaVis mitigates these problems by combining natural language edits with automatically created widgets that remain available for interactive adjustment.",
+    "segments": {
+      "DynaVis": 0,
+      "mitigates these problems": 2,
+      "by combining natural language edits with automatically created widgets that remain available": 1,
+      "for interactive adjustment": 3
+    }
+  },
+  "approach-9": {
+    "id": "approach-9",
+    "typeId": "approach-thesis",
+    "text": "DynaVis proposes a hybrid solution: natural language instructions initiate edits, and synthesized widgets enable further exploration with confidence.",
+    "segments": {
+      "DynaVis proposes a hybrid solution": 0,
+      "natural language instructions initiate edits": 1,
+      "and synthesized widgets enable further exploration with confidence": 1
+    }
+  },
+  "approach-10": {
+    "id": "approach-10",
+    "typeId": "approach-thesis",
+    "text": "DynaVis solves this by executing natural language commands while producing widgets that persist for reuse and modification.",
+    "segments": {
+      "DynaVis": 0,
+      "solves this": 2,
+      "by executing natural language commands while producing widgets that persist": 1,
+      "for reuse and modification": 3
+    }
+  },
+  "approach-11": {
+    "id": "approach-11",
+    "typeId": "approach-thesis",
+    "text": "This tool has potential to combine natural language edits that allow users to interact and adjust accordingly.",
+    "segments": {
+      "This tool": 0,
+      "has potential": 1,
+      "to combine natural language edits": 1,
+      "that allow users to interact and adjust accordingly": 3
+    }
+  },
+  "approach-12": {
+    "id": "approach-12",
+    "typeId": "approach-thesis",
+    "text": "The authors propose DynaVis, a system that performs edits based on natural language queries while also creating persistent UI elements for ongoing adjustment.",
+    "segments": {
+      "The authors propose DynaVis, a system": 0,
+      "that performs edits based on natural language queries while also creating persistent UI elements": 1,
+      "for ongoing adjustment": 3
+    }
+  },
+  "approach-13": {
+    "id": "approach-13",
+    "typeId": "approach-thesis",
+    "text": "DynaVis bridges this gap by listening to natural language commands and producing UI widgets that preserve flexibility for repeated edits.",
+    "segments": {
+      "DynaVis": 0,
+      "bridges this gap": 2,
+      "by listening to natural language commands and producing UI widgets that preserve flexibility": 1,
+      "for repeated edits": 3
+    }
+  },
+  "approach-14": {
+    "id": "approach-14",
+    "typeId": "approach-thesis",
+    "text": "The DynaVis system balances this tradeoff by letting users issue commands in natural language and then preserving those commands as interactive widgets for future refinement.",
+    "segments": {
+      "The DynaVis system": 0,
+      "balances this tradeoff": 2,
+      "by letting users issue commands in natural language": 1,
+      "and then preserving those commands as interactive widgets for future refinement": 1
+    }
+  },
+  "approach-15": {
+    "id": "approach-15",
+    "typeId": "approach-thesis",
+    "text": "DynaVis mitigates these problems by combining natural language edits with automatically created widgets that remain available for interactive adjustment.",
+    "segments": {
+      "DynaVis": 0,
+      "mitigates these problems": 2,
+      "by combining natural language edits with automatically created widgets that remain available": 1,
+      "for interactive adjustment": 3
+    }
+  },
+  "approach-16": {
+    "id": "approach-16",
+    "typeId": "approach-thesis",
+    "text": "DynaVis integrates the two by dynamically synthesizing widgets after each natural language edit.",
+    "segments": {
+      "DynaVis": 0,
+      "integrates the two": 1,
+      "by dynamically synthesizing widgets after each natural language edit": 1
+    }
+  },
+  "novelty-1": {
+    "id": "novelty-1",
+    "typeId": "novelty-thesis",
+    "text": "This combination is novel in that it merges the flexibility of natural language with the iterative control of GUI widgets.",
+    "segments": {
+      "This combination is novel": 1,
+      "in that it merges the flexibility of natural language with the iterative control of GUI widgets": 2
+    }
+  },
+  "novelty-2": {
+    "id": "novelty-2",
+    "typeId": "novelty-thesis",
+    "text": "This approach is novel because it turns transient language commands into persistent, reusable GUI elements.",
+    "segments": {
+      "This approach is novel": 1,
+      "because it turns transient language commands into persistent, reusable GUI elements": 2
+    }
+  },
+  "novelty-3": {
+    "id": "novelty-3",
+    "typeId": "novelty-thesis",
+    "text": "This is novel in how it fuses the strengths of both paradigms rather than choosing one over the other.",
+    "segments": {
+      "This is novel": 1,
+      "in how it fuses the strengths of both paradigms": 2,
+      "rather than choosing one over the other": 0
+    }
+  },
+  "novelty-4": {
+    "id": "novelty-4",
+    "typeId": "novelty-thesis",
+    "text": "Its novelty lies in giving users immediate visual feedback and iterative control without overwhelming them with static options.",
+    "segments": {
+      "Its novelty lies": 1,
+      "in giving users immediate visual feedback and iterative control": 2,
+      "without overwhelming them with static options": 0
+    }
+  },
+  "novelty-5": {
+    "id": "novelty-5",
+    "typeId": "novelty-thesis",
+    "text": "DynaVis is different from similar previous systems in that it offers ease of choosing a widget and granular control of that widget at the same time.",
+    "segments": {
+      "DynaVis is different from similar previous systems": 1,
+      "in that it offers ease of choosing a widget and granular control of that widget": 2,
+      "at the same time": 0
+    }
+  },
+  "novelty-6": {
+    "id": "novelty-6",
+    "typeId": "novelty-thesis",
+    "text": "This is novel because it fuses the strengths of both paradigms rather than choosing one over the other.",
+    "segments": {
+      "This is novel": 1,
+      "because it fuses the strengths of both paradigms": 2,
+      "rather than choosing one over the other": 0
+    }
+  }
+}
