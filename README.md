@@ -2,12 +2,28 @@
 
 A Python package that labels sentence segments given predefined segment labels using OpenAI API
 
-## Installation
+## Install and Build
 
-To install this package, run:
-
+### From PyPI (end users)
 ```bash
 pip install phrase-labeler
+```
+
+### For local development
+Create a virtual environment and install in editable mode (so changes to the source are immediately reflected):
+
+```bash
+python -m venv venv
+venv\Scripts\activate
+pip install -e .[eval,mlflow]
+```
+
+Set `OPENAI_API_KEY` in your environment or `.env` at the repo root (used by the eval harness).
+
+### Build the package (for distribution)
+```bash
+python -m pip install build
+python -m build
 ```
 
 ## Command-Line Usage
@@ -57,6 +73,22 @@ The harness writes JSONL results and a summary JSON into a timestamped folder un
 Progress uses `tqdm` if installed (defaults to on), concurrency defaults to 1, and rate-limit retries use built-in defaults. These are intentionally not part of the experiment config.
 
 If you provide `--prompt-file`, it should be a text file that uses `${sentence}`, `${categories}`, and optionally `${category_count}` placeholders. See `prompts/default.txt` for the default template.
+
+## MLflow Logging
+
+To log completed eval runs to MLflow, use the separate script:
+
+```bash
+python scripts/log_to_mlflow.py --run-dir eval_runs/<timestamp_dir>
+```
+
+Optional flags include `--experiment-name`, `--tracking-uri`, and `--run-name-prefix`.
+
+## Testing
+
+```bash
+python -m unittest -q
+```
 
 ## Module Layout
 

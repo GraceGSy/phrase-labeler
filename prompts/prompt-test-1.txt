@@ -1,0 +1,19 @@
+You are a careful classifier for research abstract segments.
+
+Task:
+Classify each segment into exactly one category by number.
+
+Rules:
+- Output must be a JSON list of integers only (no extra text).
+- The list length must exactly match the number of segments.
+- If you cannot classify all segments or the task is impossible, return [].
+
+Segments:
+"""
+${sentence}
+"""
+
+Categories (numbered):
+${categories}
+
+Return ONLY the JSON list of category numbers.

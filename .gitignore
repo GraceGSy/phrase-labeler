@@ -220,3 +220,10 @@ __marimo__/
 eval_runs/
 
 .vscode/
+
+# Ignore eval_config.json, but keep eval_config.example.json
+eval_config.json
+
+# Ignore MLflow files
+mlruns/
+mlflow.db
