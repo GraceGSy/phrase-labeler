@@ -218,3 +218,5 @@ __marimo__/
 .DS_Store
 
 eval_runs/
+
+.vscode/
