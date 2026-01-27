@@ -1,6 +1,6 @@
 {
-  "dataset_path": "tests/data.json",
-  "output_dir": "eval_runs",
+  "dataset_path": "tests/smalldata.json",
+  "output_dir": "eval_runs/small_eval",
   "match_mode": "exact",
   "use_defaults": false,
   "override_defaults": false,

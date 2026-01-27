@@ -64,9 +64,11 @@ class EvalHarnessTests(unittest.TestCase):
                 config_path,
                 api_key="test-key",
                 call_model_fn=stub_call_model,
+                show_progress=False,
             )
 
             self.assertEqual(result["output_dir"], output_dir)
+            self.assertTrue(os.path.isdir(result["run_dir"]))
             self.assertEqual(len(result["runs"]), 1)
 
             summary_path = result["runs"][0]["summary"]

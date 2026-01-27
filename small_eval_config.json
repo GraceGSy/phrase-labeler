@@ -1,20 +1,18 @@
 {
-  "dataset_path": "tests/data.json",
-  "output_dir": "eval_runs",
+  "dataset_path": "tests/smalldata.json",
+  "output_dir": "eval_runs/small_eval",
   "match_mode": "exact",
+  "concurrency": 1,
+  "show_progress": true,
+  "max_retries": 3,
+  "base_delay": 0.5,
+  "max_delay": 5.0,
+  "jitter": 0.2,
   "use_defaults": false,
   "override_defaults": false,
   "label_sets": {
     "need-thesis": {
       "path": "categories/need.json",
-      "use_defaults": false
-    },
-    "approach-thesis": {
-      "path": "categories/approach.json",
-      "use_defaults": false
-    },
-    "novelty-thesis": {
-      "path": "categories/novelty.json",
       "use_defaults": false
     }
   },

@@ -1,0 +1,54 @@
+{
+  "need-1": {
+    "id": "need-1",
+    "typeId": "need-thesis",
+    "text": "Users often struggle with visualization editing because GUIs overwhelm them with too many options or restrict them with too few.",
+    "segments": {
+      "Users": 0,
+      "often struggle": 3,
+      "with visualization editing": 2,
+      "because GUIs overwhelm them with too many options or restrict them with too few": 3
+    }
+  },
+  "need-2": {
+    "id": "need-2",
+    "typeId": "need-thesis",
+    "text": "Many people find GUIs either too complex or too limited when editing visualizations, which hinders creative exploration.",
+    "segments": {
+      "Many people": 0,
+      "when editing visualizations": 2,
+      "find GUIs either too complex or too limited": 3,
+      "which hinders creative exploration": 3
+    }
+  },
+  "need-3": {
+    "id": "need-3",
+    "typeId": "need-thesis",
+    "text": "Because visualization editing involves navigating a vast option space, GUIs frequently lead to frustration and inefficiency.",
+    "segments": {
+      "Because visualization editing involves navigating a vast option space": 4,
+      "GUIs frequently lead to frustration and inefficiency": 3
+    }
+  },
+  "need-4": {
+    "id": "need-4",
+    "typeId": "need-thesis",
+    "text": "Users are often stuck choosing between GUI systems that are overwhelming and those that are too constrained.",
+    "segments": {
+      "Users": 0,
+      "are often stuck choosing between GUI systems that are overwhelming and those that are too constrained": 3
+    }
+  },
+  "need-5": {
+    "id": "need-5",
+    "typeId": "need-thesis",
+    "text": "Professionals, particularly working within large enterprises, who are inundated with large amounts of data and visual information when critically processing large dataset, often feel overwhelmed and required editing tools, but most of these tools are complex and require tailored visual interfaces.",
+    "segments": {
+      "Professionals, particularly working within large enterprises": 0,
+      "who are inundated with large amounts of data and visual information": 1,
+      "when critically processing large dataset": 2,
+      "often feel overwhelmed and required editing tools": 3,
+      "but most of these tools are complex and require tailored visual interfaces": 4
+    }
+  }
+}

@@ -1,9 +1,17 @@
 import ast
 import json
 import os
+import random
+import time
 import uuid
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from typing import Callable, Dict, Iterable, Optional
+
+try:
+    from tqdm import tqdm
+except ImportError:  # pragma: no cover - optional dependency
+    tqdm = None
 
 from .categories import load_categories
 from .prompting import DEFAULT_CATEGORIES, build_prompt
@@ -93,6 +101,18 @@ def _slugify(value: str) -> str:
     return "".join(cleaned) or "run"
 
 
+def _unique_path(path: str) -> str:
+    if not os.path.exists(path):
+        return path
+    base, ext = os.path.splitext(path)
+    counter = 1
+    while True:
+        candidate = f"{base}_{counter}{ext}"
+        if not os.path.exists(candidate):
+            return candidate
+        counter += 1
+
+
 def _normalize_prompt_sets(prompt_sets: Iterable, base_dir: str) -> list[dict]:
     normalized = []
     for entry in prompt_sets:
@@ -160,11 +180,44 @@ def _compare_labels(predicted: list[int], expected: list[int], match_mode: str) 
     return predicted == expected, correct / len(expected) if expected else 0.0
 
 
+def _error_code_from_exception(exc: Exception) -> Optional[str]:
+    code = getattr(exc, "code", None)
+    if isinstance(code, str):
+        return code
+    error = getattr(exc, "error", None)
+    if isinstance(error, dict):
+        return error.get("code")
+    message = str(exc)
+    if "rate_limit_exceeded" in message:
+        return "rate_limit_exceeded"
+    if "insufficient_quota" in message:
+        return "insufficient_quota"
+    return None
+
+
+def _is_rate_limit_error(exc: Exception) -> bool:
+    if exc.__class__.__name__ == "RateLimitError":
+        return True
+    return _error_code_from_exception(exc) == "rate_limit_exceeded"
+
+
+def _is_quota_error(exc: Exception) -> bool:
+    return _error_code_from_exception(exc) == "insufficient_quota"
+
+
+def _sleep_with_backoff(attempt: int, base_delay: float, max_delay: float, jitter: float) -> None:
+    delay = min(max_delay, base_delay * (2 ** attempt))
+    if jitter > 0:
+        delay += random.random() * jitter
+    time.sleep(delay)
+
+
 def run_eval_from_config(
     config_path: str,
     api_key: Optional[str] = None,
     api_key_env: str = "OPENAI_API_KEY",
     call_model_fn: Optional[Callable[..., list[str]]] = None,
+    show_progress: Optional[bool] = None,
 ) -> dict:
     config_path = os.path.abspath(config_path)
     base_dir = os.path.dirname(config_path)
@@ -194,6 +247,15 @@ def run_eval_from_config(
         "override_defaults": config.get("override_defaults", False),
     }
     match_mode = config.get("match_mode", "exact")
+    retry_config = {
+        "max_retries": 3,
+        "base_delay": 0.5,
+        "max_delay": 5.0,
+        "jitter": 0.2,
+    }
+    concurrency = 1
+    if show_progress is None:
+        show_progress = True
 
     prompt_sets_norm = _normalize_prompt_sets(prompt_sets, base_dir)
     models_norm = _normalize_models(models)
@@ -210,17 +272,126 @@ def run_eval_from_config(
     caller = call_model_fn or call_model
     run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
     run_suffix = uuid.uuid4().hex[:8]
+    run_dir = os.path.join(output_dir, f"{run_id}_{run_suffix}")
+    os.makedirs(run_dir, exist_ok=True)
 
     output_files = []
+
+    categories_by_type: Dict[str, list[str]] = {}
+    for type_id, label_cfg in label_sets_norm.items():
+        categories_by_type[type_id] = load_categories(
+            label_cfg["path"],
+            use_defaults=label_cfg["use_defaults"],
+            override=label_cfg["override_defaults"],
+            defaults=DEFAULT_CATEGORIES,
+        )
 
     for prompt_set in prompt_sets_norm:
         prompt_text = _load_text(prompt_set["path"])
         for model_cfg in models_norm:
-            tag = f"{run_id}_{_slugify(prompt_set['name'])}_{_slugify(model_cfg['name'])}_t{model_cfg['temperature']}"
-            tag = f"{tag}_{run_suffix}"
-            results_path = os.path.join(output_dir, f"{tag}.jsonl")
-            summary_path = os.path.join(output_dir, f"{tag}_summary.json")
-            config_snapshot_path = os.path.join(output_dir, f"{tag}_config.json")
+            base_name = f"{_slugify(prompt_set['name'])}_{_slugify(model_cfg['name'])}_t{model_cfg['temperature']}"
+            results_path = _unique_path(os.path.join(run_dir, f"{base_name}.jsonl"))
+            summary_path = _unique_path(os.path.join(run_dir, f"{base_name}_summary.json"))
+            config_snapshot_path = _unique_path(os.path.join(run_dir, f"{base_name}_config.json"))
+
+            def evaluate_example(example_id: str, example: dict) -> dict:
+                type_id = example.get("typeId")
+                if type_id not in categories_by_type:
+                    raise ValueError(f"No label set configured for typeId '{type_id}'.")
+
+                segments_map = example.get("segments", {})
+                if not isinstance(segments_map, dict):
+                    raise ValueError(f"Example {example_id} has invalid segments.")
+                segments = list(segments_map.keys())
+                expected = list(segments_map.values())
+
+                prompt = build_prompt(segments, categories_by_type[type_id], prompt_text)
+                raw_responses = []
+                predicted: list[int] = []
+                error = None
+
+                attempt = 0
+                while True:
+                    try:
+                        raw_responses = caller(
+                            prompt=prompt,
+                            model=model_cfg["model"],
+                            temperature=model_cfg["temperature"],
+                            n=model_cfg["n"],
+                            api_key=api_key,
+                            system_prompt=prompt_set.get("system_prompt"),
+                        )
+                        for response_text in raw_responses:
+                            try:
+                                predicted = parse_labels(response_text)
+                                break
+                            except ValueError as exc:
+                                error = str(exc)
+                        if not predicted and error is None:
+                            error = "No responses returned from model."
+                        break
+                    except Exception as exc:
+                        error = str(exc)
+                        if _is_quota_error(exc):
+                            break
+                        if _is_rate_limit_error(exc) and attempt < retry_config["max_retries"]:
+                            _sleep_with_backoff(
+                                attempt,
+                                retry_config["base_delay"],
+                                retry_config["max_delay"],
+                                retry_config["jitter"],
+                            )
+                            attempt += 1
+                            continue
+                        break
+
+                exact_match, segment_accuracy = _compare_labels(predicted, expected, match_mode)
+
+                return {
+                    "example_id": example_id,
+                    "type_id": type_id,
+                    "text": example.get("text"),
+                    "segments": segments,
+                    "expected": expected,
+                    "predicted": predicted,
+                    "exact_match": exact_match,
+                    "segment_accuracy": segment_accuracy,
+                    "prompt_name": prompt_set["name"],
+                    "prompt_file": prompt_set["path"],
+                    "model": model_cfg["model"],
+                    "temperature": model_cfg["temperature"],
+                    "n": model_cfg["n"],
+                    "raw_responses": raw_responses,
+                    "error": error,
+                }
+
+            records: list[dict] = []
+            total_items = len(dataset)
+            desc = f"{prompt_set['name']} / {model_cfg['name']}"
+
+            if show_progress and tqdm:
+                progress = tqdm(total=total_items, desc=desc)
+            else:
+                progress = None
+
+            if concurrency == 1:
+                for example_id, example in dataset.items():
+                    records.append(evaluate_example(example_id, example))
+                    if progress:
+                        progress.update(1)
+            else:
+                with ThreadPoolExecutor(max_workers=concurrency) as executor:
+                    futures = {
+                        executor.submit(evaluate_example, example_id, example): example_id
+                        for example_id, example in dataset.items()
+                    }
+                    for future in as_completed(futures):
+                        records.append(future.result())
+                        if progress:
+                            progress.update(1)
+
+            if progress:
+                progress.close()
 
             type_stats: Dict[str, Dict[str, float]] = {}
             total = 0
@@ -228,91 +399,29 @@ def run_eval_from_config(
             total_segment_correct = 0
             total_segments = 0
 
-            categories_cache: Dict[str, list[str]] = {}
-
             with open(results_path, "w", encoding="utf-8") as results_handle:
-                for example_id, example in dataset.items():
-                    type_id = example.get("typeId")
-                    if type_id not in label_sets_norm:
-                        raise ValueError(f"No label set configured for typeId '{type_id}'.")
-
-                    if type_id not in categories_cache:
-                        label_cfg = label_sets_norm[type_id]
-                        categories_cache[type_id] = load_categories(
-                            label_cfg["path"],
-                            use_defaults=label_cfg["use_defaults"],
-                            override=label_cfg["override_defaults"],
-                            defaults=DEFAULT_CATEGORIES,
-                        )
-
-                    segments_map = example.get("segments", {})
-                    if not isinstance(segments_map, dict):
-                        raise ValueError(f"Example {example_id} has invalid segments.")
-                    segments = list(segments_map.keys())
-                    expected = list(segments_map.values())
-
-                    prompt = build_prompt(segments, categories_cache[type_id], prompt_text)
-                    raw_responses = caller(
-                        prompt=prompt,
-                        model=model_cfg["model"],
-                        temperature=model_cfg["temperature"],
-                        n=model_cfg["n"],
-                        api_key=api_key,
-                        system_prompt=prompt_set.get("system_prompt"),
-                    )
-
-                    predicted = []
-                    error = None
-                    for response_text in raw_responses:
-                        try:
-                            predicted = parse_labels(response_text)
-                            break
-                        except ValueError as exc:
-                            error = str(exc)
-
-                    if not predicted and error is None:
-                        error = "No responses returned from model."
-
-                    exact_match, segment_accuracy = _compare_labels(predicted, expected, match_mode)
-
+                for record in records:
                     total += 1
-                    if exact_match:
+                    if record["exact_match"]:
                         total_exact += 1
-                    total_segments += len(expected)
-                    total_segment_correct += int(segment_accuracy * len(expected))
+                    total_segments += len(record["expected"])
+                    total_segment_correct += int(record["segment_accuracy"] * len(record["expected"]))
 
-                    type_stat = type_stats.setdefault(type_id, {
+                    type_stat = type_stats.setdefault(record["type_id"], {
                         "total": 0,
                         "exact": 0,
                         "segment_correct": 0,
                         "segments": 0,
                     })
                     type_stat["total"] += 1
-                    type_stat["exact"] += 1 if exact_match else 0
-                    type_stat["segment_correct"] += int(segment_accuracy * len(expected))
-                    type_stat["segments"] += len(expected)
+                    type_stat["exact"] += 1 if record["exact_match"] else 0
+                    type_stat["segment_correct"] += int(record["segment_accuracy"] * len(record["expected"]))
+                    type_stat["segments"] += len(record["expected"])
 
-                    record = {
-                        "example_id": example_id,
-                        "type_id": type_id,
-                        "text": example.get("text"),
-                        "segments": segments,
-                        "expected": expected,
-                        "predicted": predicted,
-                        "exact_match": exact_match,
-                        "segment_accuracy": segment_accuracy,
-                        "prompt_name": prompt_set["name"],
-                        "prompt_file": prompt_set["path"],
-                        "model": model_cfg["model"],
-                        "temperature": model_cfg["temperature"],
-                        "n": model_cfg["n"],
-                        "raw_responses": raw_responses,
-                        "error": error,
-                    }
                     results_handle.write(json.dumps(record, ensure_ascii=False) + "\n")
 
             summary = {
-                "run_id": tag,
+                "run_id": f"{run_id}_{run_suffix}",
                 "dataset_path": dataset_path,
                 "prompt_name": prompt_set["name"],
                 "prompt_file": prompt_set["path"],
@@ -339,6 +448,7 @@ def run_eval_from_config(
                 "config_path": config_path,
                 "dataset_path": dataset_path,
                 "output_dir": output_dir,
+                "run_dir": run_dir,
                 "label_sets": label_sets_norm,
                 "prompt_set": prompt_set,
                 "model": model_cfg,
@@ -356,5 +466,6 @@ def run_eval_from_config(
 
     return {
         "output_dir": output_dir,
+        "run_dir": run_dir,
         "runs": output_files,
     }
