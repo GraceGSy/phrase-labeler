@@ -74,16 +74,6 @@ Progress uses `tqdm` if installed (defaults to on), concurrency defaults to 1, a
 
 If you provide `--prompt-file`, it should be a text file that uses `${sentence}`, `${categories}`, and optionally `${category_count}` placeholders. See `prompts/default.txt` for the default template.
 
-## MLflow Logging
-
-To log completed eval runs to MLflow, use the separate script:
-
-```bash
-python scripts/log_to_mlflow.py --run-dir eval_runs/<timestamp_dir>
-```
-
-Optional flags include `--experiment-name`, `--tracking-uri`, and `--run-name-prefix`.
-
 ## Testing
 
 ```bash

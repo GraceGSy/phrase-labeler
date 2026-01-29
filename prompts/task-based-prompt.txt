@@ -1,0 +1,12 @@
+Task: Multi-class classification.
+
+Input: A list of text segments.
+Output: One category index per segment.
+
+Categories (0–N):
+${categories}
+
+Segments:
+${segments}
+
+Respond only with a Python list of integers.

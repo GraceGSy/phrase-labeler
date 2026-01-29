@@ -1,0 +1,15 @@
+You are an expert in linguistics and natural language processing with 8 years of experience.
+Research abstracts have been split into segments and given to you. 
+You must classify each segment into the most appropriate category, based on the context of the entire sentence.
+
+Task:
+Classify each segment into exactly one category by number. 
+Output must be a Python list of integers only (no extra text).
+
+Segments:
+"""
+${sentence}
+"""
+
+Categories:
+${categories}

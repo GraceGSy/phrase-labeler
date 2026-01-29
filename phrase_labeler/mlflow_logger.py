@@ -48,11 +48,23 @@ def _discover_runs(run_dir: str) -> list[Dict[str, str]]:
     return runs
 
 
+def _iter_jsonl(path: Optional[str]) -> Iterable[dict]:
+    if not path or not os.path.exists(path):
+        return []
+    with open(path, "r", encoding="utf-8") as handle:
+        for line in handle:
+            line = line.strip()
+            if not line:
+                continue
+            yield json.loads(line)
+
+
 def log_run_dir_to_mlflow(
     run_dir: str,
     experiment_name: Optional[str] = None,
     tracking_uri: Optional[str] = None,
     run_name_prefix: Optional[str] = None,
+    per_example_metrics: bool = True,
 ) -> list[str]:
     import mlflow
 
@@ -108,6 +120,21 @@ def log_run_dir_to_mlflow(
 
             by_type = summary.get("by_type", {})
             mlflow.log_metrics(_flatten_metrics("by_type.", by_type))
+
+            if per_example_metrics:
+                for record in _iter_jsonl(entry.get("jsonl")):
+                    example_id = record.get("example_id")
+                    if not example_id:
+                        continue
+                    exact_match = record.get("exact_match")
+                    segment_accuracy = record.get("segment_accuracy")
+                    metrics = {}
+                    if exact_match is not None:
+                        metrics[f"example.{example_id}.exact_match"] = 1.0 if exact_match else 0.0
+                    if segment_accuracy is not None:
+                        metrics[f"example.{example_id}.segment_accuracy"] = float(segment_accuracy)
+                    if metrics:
+                        mlflow.log_metrics(metrics)
 
             for artifact in _list_artifacts(run_dir, entry["base_name"]):
                 mlflow.log_artifact(artifact)

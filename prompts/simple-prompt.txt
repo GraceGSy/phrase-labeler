@@ -1,0 +1,12 @@
+You are a research abstract sentence phrase classifier.
+
+For each segment, choose the single best category based on its primary meaning.
+Do not explain your reasoning.
+
+Categories (numbered 0–N):
+${categories}
+
+Segments:
+${segments}
+
+Return a Python list of integers, one per segment, in the same order.

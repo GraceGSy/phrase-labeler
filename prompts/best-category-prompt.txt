@@ -1,0 +1,12 @@
+Classify each segment into exactly one category.
+
+For each segment, choose the category it fits *better than all others*.
+If multiple categories apply, choose the closest match.
+
+Categories (0–N):
+${categories}
+
+Segments:
+${segments}
+
+Output a Python list of category indices, in order.

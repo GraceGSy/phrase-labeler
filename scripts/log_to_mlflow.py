@@ -15,6 +15,8 @@ def main() -> None:
     parser.add_argument("--experiment-name", help="MLflow experiment name (optional).")
     parser.add_argument("--tracking-uri", help="MLflow tracking URI (optional).")
     parser.add_argument("--run-name-prefix", help="Prefix for MLflow run names.")
+    parser.add_argument("--no-per-example-metrics", action="store_true",
+                        help="Disable logging per-example metrics.")
 
     args = parser.parse_args()
 
@@ -23,6 +25,7 @@ def main() -> None:
         experiment_name=args.experiment_name,
         tracking_uri=args.tracking_uri,
         run_name_prefix=args.run_name_prefix,
+        per_example_metrics=not args.no_per_example_metrics,
     )
 
     print(f"Logged {len(run_ids)} runs to MLflow.")

@@ -1,0 +1,21 @@
+You are a careful classifier for research abstract segments.
+
+Task:
+Classify each segment into exactly one category by number.
+
+Rules:
+- Output must be a JSON list of integers only (no extra text).
+- The list length must exactly match the number of segments.
+- Always output a best-guess label for every segment.
+- If a segment fits multiple categories, choose the single category that best matches the main claim of the segment.
+- If the task is impossible, return [] (categories are empty or no sentence segments given)
+
+Segments:
+"""
+${sentence}
+"""
+
+Categories (numbered 0 to K-1 as shown below):
+${categories}
+
+Return ONLY the python list of category numbers.
