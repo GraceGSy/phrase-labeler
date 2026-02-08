@@ -16,6 +16,8 @@ except ImportError:  # pragma: no cover - optional dependency
 from .categories import load_categories
 from .prompting import DEFAULT_CATEGORIES, build_prompt
 
+ALLOWED_REASONING_EFFORTS = {"low", "medium", "high", "xhigh"}
+
 
 def _resolve_path(base_dir: str, path: Optional[str]) -> Optional[str]:
     if path is None:
@@ -70,7 +72,8 @@ def parse_labels(raw_text: str) -> list[int]:
 def call_model(
     prompt: str,
     model: str,
-    temperature: float,
+    temperature: Optional[float],
+    reasoning_effort: Optional[str],
     n: int,
     api_key: str,
     system_prompt: Optional[str] = None,
@@ -82,12 +85,25 @@ def call_model(
     if system_prompt:
         messages.append({"role": "system", "content": system_prompt})
     messages.append({"role": "user", "content": prompt})
-    response = client.chat.completions.create(
-        model=model,
-        messages=messages,
-        n=n,
-        temperature=temperature,
-    )
+    params = {
+        "model": model,
+        "messages": messages,
+        "n": n,
+    }
+    if temperature is not None:
+        params["temperature"] = temperature
+    if reasoning_effort is not None:
+        params["reasoning_effort"] = reasoning_effort
+    try:
+        response = client.chat.completions.create(**params)
+    except TypeError as exc:
+        message = str(exc)
+        if reasoning_effort is not None and "unexpected keyword argument 'reasoning_effort'" in message:
+            raise TypeError(
+                "This OpenAI SDK does not support reasoning_effort for chat.completions. "
+                "Upgrade the openai package or omit reasoning_effort in config."
+            ) from exc
+        raise
     return [choice.message.content for choice in response.choices]
 
 
@@ -113,6 +129,17 @@ def _unique_path(path: str) -> str:
         counter += 1
 
 
+def _unique_dir(path: str) -> str:
+    if not os.path.exists(path):
+        return path
+    counter = 1
+    while True:
+        candidate = f"{path}_{counter}"
+        if not os.path.exists(candidate):
+            return candidate
+        counter += 1
+
+
 def _normalize_prompt_sets(prompt_sets: Iterable, base_dir: str) -> list[dict]:
     normalized = []
     for entry in prompt_sets:
@@ -131,21 +158,54 @@ def _normalize_prompt_sets(prompt_sets: Iterable, base_dir: str) -> list[dict]:
     return normalized
 
 
+def _normalize_reasoning_effort(entry: dict) -> Optional[str]:
+    if "reasoning" in entry:
+        raise ValueError(
+            "Model config field 'reasoning' is not supported. Use 'reasoning_effort' instead."
+        )
+
+    effort = entry.get("reasoning_effort")
+
+    if effort is None:
+        return None
+    if not isinstance(effort, str):
+        raise ValueError(
+            "Model reasoning_effort must be null or one of: low, medium, high, xhigh."
+        )
+    effort = effort.strip().lower()
+    if effort not in ALLOWED_REASONING_EFFORTS:
+        raise ValueError(
+            "Model reasoning_effort must be null or one of: low, medium, high, xhigh."
+        )
+    return effort
+
+
 def _normalize_models(models: Iterable) -> list[dict]:
     normalized = []
     for entry in models:
         if isinstance(entry, str):
-            normalized.append({"model": entry, "name": entry, "temperature": 0.2, "n": 1})
+            normalized.append({
+                "model": entry,
+                "name": entry,
+                "temperature": None,
+                "reasoning_effort": None,
+                "n": 1,
+            })
             continue
         if not isinstance(entry, dict):
             raise ValueError("Each model entry must be a string or an object.")
         model = entry.get("model") or entry.get("name")
         if not model:
             raise ValueError("Each model entry must define 'model' or 'name'.")
+        temperature = entry.get("temperature")
+        if temperature is not None:
+            temperature = float(temperature)
+        reasoning_effort = _normalize_reasoning_effort(entry)
         normalized.append({
             "model": model,
             "name": entry.get("name", model),
-            "temperature": entry.get("temperature", 0.2),
+            "temperature": temperature,
+            "reasoning_effort": reasoning_effort,
             "n": entry.get("n", 1),
         })
     return normalized
@@ -242,6 +302,10 @@ def run_eval_from_config(
     output_dir = _resolve_path(base_dir, config.get("output_dir", "eval_runs"))
     os.makedirs(output_dir, exist_ok=True)
 
+    run_name = config.get("run_name")
+    if not run_name or not isinstance(run_name, str):
+        raise ValueError("Config must include a non-empty 'run_name' string.")
+
     defaults = {
         "use_defaults": config.get("use_defaults", True),
         "override_defaults": config.get("override_defaults", False),
@@ -270,9 +334,7 @@ def run_eval_from_config(
         raise ValueError("Dataset must be a JSON object mapping IDs to examples.")
 
     caller = call_model_fn or call_model
-    run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
-    run_suffix = uuid.uuid4().hex[:8]
-    run_dir = os.path.join(output_dir, f"{run_id}_{run_suffix}")
+    run_dir = _unique_dir(os.path.join(output_dir, run_name))
     os.makedirs(run_dir, exist_ok=True)
 
     output_files = []
@@ -289,7 +351,13 @@ def run_eval_from_config(
     for prompt_set in prompt_sets_norm:
         prompt_text = _load_text(prompt_set["path"])
         for model_cfg in models_norm:
-            base_name = f"{_slugify(prompt_set['name'])}_{_slugify(model_cfg['name'])}_t{model_cfg['temperature']}"
+            reasoning_suffix = ""
+            if model_cfg["reasoning_effort"] is not None:
+                reasoning_suffix = f"_r{_slugify(model_cfg['reasoning_effort'])}"
+            base_name = (
+                f"{_slugify(prompt_set['name'])}_{_slugify(model_cfg['name'])}"
+                f"_t{model_cfg['temperature']}{reasoning_suffix}"
+            )
             results_path = _unique_path(os.path.join(run_dir, f"{base_name}.jsonl"))
             summary_path = _unique_path(os.path.join(run_dir, f"{base_name}_summary.json"))
             config_snapshot_path = _unique_path(os.path.join(run_dir, f"{base_name}_config.json"))
@@ -317,6 +385,7 @@ def run_eval_from_config(
                             prompt=prompt,
                             model=model_cfg["model"],
                             temperature=model_cfg["temperature"],
+                            reasoning_effort=model_cfg["reasoning_effort"],
                             n=model_cfg["n"],
                             api_key=api_key,
                             system_prompt=prompt_set.get("system_prompt"),
@@ -360,6 +429,7 @@ def run_eval_from_config(
                     "prompt_file": prompt_set["path"],
                     "model": model_cfg["model"],
                     "temperature": model_cfg["temperature"],
+                    "reasoning_effort": model_cfg["reasoning_effort"],
                     "n": model_cfg["n"],
                     "raw_responses": raw_responses,
                     "error": error,
@@ -421,12 +491,13 @@ def run_eval_from_config(
                     results_handle.write(json.dumps(record, ensure_ascii=False) + "\n")
 
             summary = {
-                "run_id": f"{run_id}_{run_suffix}",
+                "run_id": os.path.basename(run_dir),
                 "dataset_path": dataset_path,
                 "prompt_name": prompt_set["name"],
                 "prompt_file": prompt_set["path"],
                 "model": model_cfg["model"],
                 "temperature": model_cfg["temperature"],
+                "reasoning_effort": model_cfg["reasoning_effort"],
                 "n": model_cfg["n"],
                 "match_mode": match_mode,
                 "total_examples": total,

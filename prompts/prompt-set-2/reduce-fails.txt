@@ -1,0 +1,15 @@
+Multi-class classification.
+
+Categories (0..N-1):
+${categories}
+
+Segments:
+${sentence}
+
+Hard rules:
+- Always output a label for every segment.
+- Never return [] unless Categories is empty OR Segments is empty.
+- Output must be only a Python list of integers; no other text.
+- Length(output) == number of segments.
+
+Output:

@@ -54,16 +54,16 @@ Optional flags:
 ]
 ```
 
-2) Run the eval once:
+2) Set a `run_name` in your config and run the eval once:
 
 ```bash
 python scripts/run_eval.py --config eval_config.json
 ```
 
-This creates a single timestamped run folder that contains one JSONL + summary per prompt/model combination, for example:
+This creates a single run folder that contains one JSONL + summary per prompt/model combination, for example:
 
 ```
-eval_runs/20260127_160832_87582f45/
+eval_runs/baseline_eval/
   default_gpt-41-mini_t0.2.jsonl
   default_gpt-41-mini_t0.2_summary.json
   default_gpt-41-mini_t0.2_config.json

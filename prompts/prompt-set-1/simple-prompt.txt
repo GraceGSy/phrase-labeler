@@ -7,6 +7,6 @@ Categories (numbered 0–N):
 ${categories}
 
 Segments:
-${segments}
+${sentence}
 
 Return a Python list of integers, one per segment, in the same order.

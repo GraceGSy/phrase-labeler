@@ -1,0 +1,7 @@
+Categories:
+${categories}
+
+Segments:
+${sentence}
+
+Return ONLY a Python list of integers, one per segment, same order.

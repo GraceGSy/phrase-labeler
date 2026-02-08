@@ -7,6 +7,6 @@ Categories (0–N):
 ${categories}
 
 Segments:
-${segments}
+${sentence}
 
 Respond only with a Python list of integers.

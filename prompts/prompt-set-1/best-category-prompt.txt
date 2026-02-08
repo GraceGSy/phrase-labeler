@@ -7,6 +7,6 @@ Categories (0–N):
 ${categories}
 
 Segments:
-${segments}
+${sentence}
 
 Output a Python list of category indices, in order.

@@ -97,6 +97,7 @@ def log_run_dir_to_mlflow(
                 "prompt_file": summary.get("prompt_file"),
                 "model": summary.get("model"),
                 "temperature": summary.get("temperature"),
+                "reasoning_effort": summary.get("reasoning_effort"),
                 "n": summary.get("n"),
                 "match_mode": summary.get("match_mode"),
                 "dataset_path": summary.get("dataset_path"),

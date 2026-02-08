@@ -68,9 +68,21 @@ python scripts/run_eval.py --config eval_config.example.json --api-key YOUR_KEY
 
 The eval script also reads `.env` from the repo root, so you can set `OPENAI_API_KEY` there.
 
-The harness writes JSONL results and a summary JSON into a timestamped folder under `eval_runs/` (filenames omit timestamps). The config file lets you vary prompts, models, temperatures, and label sets.
+The harness writes JSONL results and a summary JSON into a folder named by `run_name` under `eval_runs/` (filenames omit timestamps).
 
 Progress uses `tqdm` if installed (defaults to on), concurrency defaults to 1, and rate-limit retries use built-in defaults. These are intentionally not part of the experiment config.
+
+Each model entry can include optional reasoning effort:
+```json
+{
+  "model": "gpt-5-mini",
+  "temperature": null,
+  "reasoning_effort": "high",
+  "n": 1
+}
+```
+`temperature` is optional; if omitted or `null`, it is not sent and the model/provider default is used.
+Allowed values for `reasoning_effort` are `null`, `low`, `medium`, `high`, and `xhigh`.
 
 If you provide `--prompt-file`, it should be a text file that uses `${sentence}`, `${categories}`, and optionally `${category_count}` placeholders. See `prompts/default.txt` for the default template.
 
