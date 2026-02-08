@@ -224,6 +224,9 @@ eval_runs/
 # Ignore eval_config.json, but keep eval_config.example.json
 eval_config.json
 
+# Ignore phrase_tagger_responses.json
+phrase_tagger_responses.json
+
 # Ignore MLflow files
 mlruns/
 mlflow.db
