@@ -65,6 +65,11 @@ Example:
 ```bash
 python scripts/run_eval.py --config eval_config.example.json --api-key YOUR_KEY
 ```
+You can force-enable or disable judge mode from CLI without editing config:
+```bash
+python scripts/run_eval.py --config eval_config.example.json --judge-enabled
+python scripts/run_eval.py --config eval_config.example.json --no-judge-enabled
+```
 
 The eval script also reads `.env` from the repo root, so you can set `OPENAI_API_KEY` there.
 
@@ -85,6 +90,62 @@ Each model entry can include optional reasoning effort:
 Allowed values for `reasoning_effort` are `null`, `low`, `medium`, `high`, and `xhigh`.
 
 If you provide `--prompt-file`, it should be a text file that uses `${sentence}`, `${categories}`, and optionally `${category_count}` placeholders. See `prompts/default.txt` for the default template.
+
+### Judge Correction Mode
+
+The harness supports an optional second-pass LLM judge that takes the model output and returns corrected labels in the same list shape.
+
+Add a `judge` block in config:
+```json
+{
+  "judge": {
+    "enabled": true,
+    "mode": "correct_labels",
+    "prompt_path": "prompts/judge/correct-labels.txt",
+    "system_prompt": null,
+    "fallback_to_base_on_error": true,
+    "model": {
+      "name": "gpt-4.1-mini-judge",
+      "model": "gpt-4.1-mini",
+      "temperature": null,
+      "reasoning_effort": null,
+      "n": 1
+    }
+  }
+}
+```
+
+When enabled, each JSONL record includes:
+- `predicted`: base model output
+- `judge_corrected`: judge-proposed corrected labels (if valid)
+- `final_predicted`: labels used for scoring (`judge_corrected` when available, otherwise base output)
+- `judge_error`: populated when correction fails/parsing fails
+
+The evaluation report (`scripts/analyze_eval_results.py`) uses `final_predicted` when present.
+
+### Eval Analysis CLI
+
+Use the short CLI command:
+
+```bash
+analyze-eval eval_runs/singleshot-eval-judge
+```
+
+You can still use:
+
+```bash
+python scripts/analyze_eval_results.py eval_runs/singleshot-eval-judge
+```
+
+When you pass only a directory, defaults are:
+- HTML report output: `<that directory>/eval_analysis_report.html`
+- Metrics JSON output: `<that directory>/eval_analysis_metrics.json`
+- `min_wrong_runs`: `1`
+- `min_wrong_rate`: `25`
+
+You can override any default with flags such as `--output`, `--metrics-output`, `--min-wrong-runs`, and `--min-wrong-rate`.
+
+If judge mode was used in the eval JSONL, the analysis report includes judge impact metrics (improved vs worsened vs unchanged, plus net segment delta). If no judge-enabled records are present, judge-specific cards/columns/metrics are omitted.
 
 ## Testing
 

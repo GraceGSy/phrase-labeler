@@ -26,6 +26,7 @@ Homepage = "https://github.com/ZiweiGu/GP-TSM"
 
 [project.scripts]
 label-phrase = "phrase_labeler.cli:main"
+analyze-eval = "phrase_labeler.analyze_eval_results:main"
 
 [project.optional-dependencies]
 eval = ["tqdm"]

@@ -3,9 +3,8 @@ import json
 import os
 import random
 import time
-import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime
+from string import Template
 from typing import Callable, Dict, Iterable, Optional
 
 try:
@@ -14,7 +13,7 @@ except ImportError:  # pragma: no cover - optional dependency
     tqdm = None
 
 from .categories import load_categories
-from .prompting import DEFAULT_CATEGORIES, build_prompt
+from .prompting import DEFAULT_CATEGORIES, build_prompt, format_categories, format_sentence
 
 ALLOWED_REASONING_EFFORTS = {"low", "medium", "high", "xhigh"}
 
@@ -67,6 +66,15 @@ def parse_labels(raw_text: str) -> list[int]:
             if isinstance(data, list) and all(isinstance(i, int) for i in data):
                 return data
     raise ValueError("Could not parse label list from response.")
+
+
+def parse_correction_labels(raw_text: str, expected_length: int) -> list[int]:
+    labels = parse_labels(raw_text)
+    if len(labels) != expected_length:
+        raise ValueError(
+            f"Correction length mismatch (predicted={len(labels)}, expected={expected_length})."
+        )
+    return labels
 
 
 def call_model(
@@ -211,6 +219,46 @@ def _normalize_models(models: Iterable) -> list[dict]:
     return normalized
 
 
+def _normalize_judge_config(judge: Optional[dict], base_dir: str) -> dict:
+    if judge is None:
+        return {
+            "enabled": False,
+            "mode": "correct_labels",
+            "prompt_path": None,
+            "system_prompt": None,
+            "fallback_to_base_on_error": True,
+            "model": None,
+        }
+    if not isinstance(judge, dict):
+        raise ValueError("Config field 'judge' must be an object when provided.")
+
+    enabled = bool(judge.get("enabled", False))
+    mode = str(judge.get("mode", "correct_labels")).strip().lower()
+    if mode != "correct_labels":
+        raise ValueError("Judge mode must be 'correct_labels'.")
+
+    normalized = {
+        "enabled": enabled,
+        "mode": mode,
+        "prompt_path": None,
+        "system_prompt": judge.get("system_prompt"),
+        "fallback_to_base_on_error": bool(judge.get("fallback_to_base_on_error", True)),
+        "model": None,
+    }
+    if not enabled:
+        return normalized
+
+    prompt_path = judge.get("prompt_path")
+    if not isinstance(prompt_path, str) or not prompt_path.strip():
+        raise ValueError("Judge config must include a non-empty 'prompt_path' when enabled.")
+    normalized["prompt_path"] = _resolve_path(base_dir, prompt_path)
+
+    if "model" not in judge:
+        raise ValueError("Judge config must include a 'model' entry when enabled.")
+    normalized["model"] = _normalize_models([judge["model"]])[0]
+    return normalized
+
+
 def _normalize_label_sets(label_sets: Dict, base_dir: str, defaults: dict) -> dict:
     normalized = {}
     for type_id, entry in label_sets.items():
@@ -229,6 +277,25 @@ def _normalize_label_sets(label_sets: Dict, base_dir: str, defaults: dict) -> di
             "override_defaults": entry.get("override_defaults", defaults["override_defaults"]),
         }
     return normalized
+
+
+def _build_judge_prompt(
+    prompt_template: str,
+    text: Optional[str],
+    segments: list[str],
+    categories: list[str],
+    predicted: list[int],
+) -> str:
+    return Template(prompt_template).safe_substitute({
+        "text": "" if text is None else str(text),
+        "sentence": format_sentence(segments),
+        "segments": format_sentence(segments),
+        "categories": format_categories(categories),
+        "category_count": len(categories),
+        "category_max": len(categories) - 1 if categories else -1,
+        "predicted": json.dumps(predicted, ensure_ascii=False),
+        "predicted_pretty": json.dumps(predicted, ensure_ascii=False, indent=2),
+    })
 
 
 def _compare_labels(predicted: list[int], expected: list[int], match_mode: str) -> tuple[bool, float]:
@@ -278,6 +345,7 @@ def run_eval_from_config(
     api_key_env: str = "OPENAI_API_KEY",
     call_model_fn: Optional[Callable[..., list[str]]] = None,
     show_progress: Optional[bool] = None,
+    judge_enabled: Optional[bool] = None,
 ) -> dict:
     config_path = os.path.abspath(config_path)
     base_dir = os.path.dirname(config_path)
@@ -324,6 +392,15 @@ def run_eval_from_config(
     prompt_sets_norm = _normalize_prompt_sets(prompt_sets, base_dir)
     models_norm = _normalize_models(models)
     label_sets_norm = _normalize_label_sets(label_sets, base_dir, defaults)
+    judge_config_input = config.get("judge")
+    if judge_enabled is not None:
+        if judge_config_input is None:
+            judge_config_input = {}
+        if not isinstance(judge_config_input, dict):
+            raise ValueError("Config field 'judge' must be an object when provided.")
+        judge_config_input = dict(judge_config_input)
+        judge_config_input["enabled"] = judge_enabled
+    judge_cfg = _normalize_judge_config(judge_config_input, base_dir)
 
     api_key = api_key or os.getenv(api_key_env)
     if not api_key:
@@ -348,15 +425,52 @@ def run_eval_from_config(
             defaults=DEFAULT_CATEGORIES,
         )
 
+    judge_prompt_template = None
+    if judge_cfg["enabled"]:
+        judge_prompt_template = _load_text(judge_cfg["prompt_path"])
+
+    def call_with_retry(prompt_text: str, model_cfg: dict, system_prompt: Optional[str]) -> tuple[list[str], Optional[str]]:
+        attempt = 0
+        while True:
+            try:
+                responses = caller(
+                    prompt=prompt_text,
+                    model=model_cfg["model"],
+                    temperature=model_cfg["temperature"],
+                    reasoning_effort=model_cfg["reasoning_effort"],
+                    n=model_cfg["n"],
+                    api_key=api_key,
+                    system_prompt=system_prompt,
+                )
+                return responses, None
+            except Exception as exc:
+                error = str(exc)
+                if _is_quota_error(exc):
+                    return [], error
+                if _is_rate_limit_error(exc) and attempt < retry_config["max_retries"]:
+                    _sleep_with_backoff(
+                        attempt,
+                        retry_config["base_delay"],
+                        retry_config["max_delay"],
+                        retry_config["jitter"],
+                    )
+                    attempt += 1
+                    continue
+                return [], error
+
     for prompt_set in prompt_sets_norm:
         prompt_text = _load_text(prompt_set["path"])
         for model_cfg in models_norm:
             reasoning_suffix = ""
             if model_cfg["reasoning_effort"] is not None:
                 reasoning_suffix = f"_r{_slugify(model_cfg['reasoning_effort'])}"
+            judge_suffix = ""
+            if judge_cfg["enabled"]:
+                judge_model_name = judge_cfg["model"]["name"]
+                judge_suffix = f"_j-{_slugify(judge_cfg['mode'])}-{_slugify(judge_model_name)}"
             base_name = (
                 f"{_slugify(prompt_set['name'])}_{_slugify(model_cfg['name'])}"
-                f"_t{model_cfg['temperature']}{reasoning_suffix}"
+                f"_t{model_cfg['temperature']}{reasoning_suffix}{judge_suffix}"
             )
             results_path = _unique_path(os.path.join(run_dir, f"{base_name}.jsonl"))
             summary_path = _unique_path(os.path.join(run_dir, f"{base_name}_summary.json"))
@@ -376,45 +490,59 @@ def run_eval_from_config(
                 prompt = build_prompt(segments, categories_by_type[type_id], prompt_text)
                 raw_responses = []
                 predicted: list[int] = []
+                final_predicted: list[int] = []
+                judge_corrected: list[int] = []
+                judge_raw_responses = []
+                judge_error = None
                 error = None
 
-                attempt = 0
-                while True:
+                raw_responses, error = call_with_retry(
+                    prompt_text=prompt,
+                    model_cfg=model_cfg,
+                    system_prompt=prompt_set.get("system_prompt"),
+                )
+                for response_text in raw_responses:
                     try:
-                        raw_responses = caller(
-                            prompt=prompt,
-                            model=model_cfg["model"],
-                            temperature=model_cfg["temperature"],
-                            reasoning_effort=model_cfg["reasoning_effort"],
-                            n=model_cfg["n"],
-                            api_key=api_key,
-                            system_prompt=prompt_set.get("system_prompt"),
+                        predicted = parse_labels(response_text)
+                        error = None
+                        break
+                    except ValueError as exc:
+                        error = str(exc)
+                if not predicted and error is None:
+                    error = "No responses returned from model."
+
+                final_predicted = predicted
+                judge_model_cfg = judge_cfg["model"] if judge_cfg["enabled"] else None
+                if judge_cfg["enabled"]:
+                    if error is None and predicted:
+                        judge_prompt = _build_judge_prompt(
+                            prompt_template=judge_prompt_template,
+                            text=example.get("text"),
+                            segments=segments,
+                            categories=categories_by_type[type_id],
+                            predicted=predicted,
                         )
-                        for response_text in raw_responses:
+                        judge_raw_responses, judge_error = call_with_retry(
+                            prompt_text=judge_prompt,
+                            model_cfg=judge_model_cfg,
+                            system_prompt=judge_cfg.get("system_prompt"),
+                        )
+                        for response_text in judge_raw_responses:
                             try:
-                                predicted = parse_labels(response_text)
+                                judge_corrected = parse_correction_labels(response_text, len(segments))
+                                judge_error = None
                                 break
                             except ValueError as exc:
-                                error = str(exc)
-                        if not predicted and error is None:
-                            error = "No responses returned from model."
-                        break
-                    except Exception as exc:
-                        error = str(exc)
-                        if _is_quota_error(exc):
-                            break
-                        if _is_rate_limit_error(exc) and attempt < retry_config["max_retries"]:
-                            _sleep_with_backoff(
-                                attempt,
-                                retry_config["base_delay"],
-                                retry_config["max_delay"],
-                                retry_config["jitter"],
-                            )
-                            attempt += 1
-                            continue
-                        break
+                                judge_error = str(exc)
+                        if judge_corrected:
+                            final_predicted = judge_corrected
+                        elif not judge_cfg["fallback_to_base_on_error"]:
+                            final_predicted = []
+                            error = f"Judge correction failed: {judge_error or 'No responses returned from judge.'}"
+                    else:
+                        judge_error = "Skipped judge correction because base prediction failed."
 
-                exact_match, segment_accuracy = _compare_labels(predicted, expected, match_mode)
+                exact_match, segment_accuracy = _compare_labels(final_predicted, expected, match_mode)
 
                 return {
                     "example_id": example_id,
@@ -423,6 +551,8 @@ def run_eval_from_config(
                     "segments": segments,
                     "expected": expected,
                     "predicted": predicted,
+                    "judge_corrected": judge_corrected,
+                    "final_predicted": final_predicted,
                     "exact_match": exact_match,
                     "segment_accuracy": segment_accuracy,
                     "prompt_name": prompt_set["name"],
@@ -432,6 +562,16 @@ def run_eval_from_config(
                     "reasoning_effort": model_cfg["reasoning_effort"],
                     "n": model_cfg["n"],
                     "raw_responses": raw_responses,
+                    "judge_enabled": judge_cfg["enabled"],
+                    "judge_mode": judge_cfg["mode"] if judge_cfg["enabled"] else None,
+                    "judge_model": judge_model_cfg["model"] if judge_model_cfg else None,
+                    "judge_model_name": judge_model_cfg["name"] if judge_model_cfg else None,
+                    "judge_temperature": judge_model_cfg["temperature"] if judge_model_cfg else None,
+                    "judge_reasoning_effort": judge_model_cfg["reasoning_effort"] if judge_model_cfg else None,
+                    "judge_n": judge_model_cfg["n"] if judge_model_cfg else None,
+                    "judge_prompt_path": judge_cfg["prompt_path"] if judge_cfg["enabled"] else None,
+                    "judge_raw_responses": judge_raw_responses,
+                    "judge_error": judge_error,
                     "error": error,
                 }
 
@@ -468,6 +608,9 @@ def run_eval_from_config(
             total_exact = 0
             total_segment_correct = 0
             total_segments = 0
+            judge_attempted_examples = 0
+            judge_corrected_examples = 0
+            judge_fallback_examples = 0
 
             with open(results_path, "w", encoding="utf-8") as results_handle:
                 for record in records:
@@ -476,6 +619,12 @@ def run_eval_from_config(
                         total_exact += 1
                     total_segments += len(record["expected"])
                     total_segment_correct += int(record["segment_accuracy"] * len(record["expected"]))
+                    if record.get("judge_enabled"):
+                        judge_attempted_examples += 1
+                        if record.get("judge_corrected"):
+                            judge_corrected_examples += 1
+                        elif record.get("judge_error"):
+                            judge_fallback_examples += 1
 
                     type_stat = type_stats.setdefault(record["type_id"], {
                         "total": 0,
@@ -503,6 +652,17 @@ def run_eval_from_config(
                 "total_examples": total,
                 "exact_match_rate": total_exact / total if total else 0.0,
                 "segment_accuracy": total_segment_correct / total_segments if total_segments else 0.0,
+                "uses_final_predicted": bool(judge_cfg["enabled"]),
+                "judge": {
+                    "enabled": judge_cfg["enabled"],
+                    "mode": judge_cfg["mode"] if judge_cfg["enabled"] else None,
+                    "prompt_path": judge_cfg["prompt_path"] if judge_cfg["enabled"] else None,
+                    "fallback_to_base_on_error": judge_cfg["fallback_to_base_on_error"],
+                    "model": judge_cfg["model"] if judge_cfg["enabled"] else None,
+                    "examples_with_judge_enabled": judge_attempted_examples,
+                    "examples_judge_corrected": judge_corrected_examples,
+                    "examples_judge_fallback": judge_fallback_examples,
+                },
                 "by_type": {},
             }
             for type_id, stats in type_stats.items():
@@ -523,6 +683,7 @@ def run_eval_from_config(
                 "label_sets": label_sets_norm,
                 "prompt_set": prompt_set,
                 "model": model_cfg,
+                "judge": judge_cfg,
                 "defaults": defaults,
                 "match_mode": match_mode,
             }

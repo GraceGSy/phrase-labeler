@@ -44,6 +44,12 @@ def main() -> None:
     parser.add_argument("--api-key", help="OpenAI API key (overrides env var).")
     parser.add_argument("--api-key-env", default="OPENAI_API_KEY",
                         help="Environment variable name for the API key.")
+    parser.add_argument(
+        "--judge-enabled",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Override judge.enabled from config (true/false).",
+    )
     parser.add_argument("--experiment-name", help="If set, log the run to MLflow under this experiment.")
     parser.add_argument("--tracking-uri", help="Optional MLflow tracking URI.")
 
@@ -53,6 +59,7 @@ def main() -> None:
         args.config,
         api_key=args.api_key,
         api_key_env=args.api_key_env,
+        judge_enabled=args.judge_enabled,
     )
 
     if args.experiment_name:
