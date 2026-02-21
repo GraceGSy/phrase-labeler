@@ -5,36 +5,55 @@ A Python package that labels sentence segments given predefined segment labels u
 ## Install and Build
 
 ### From PyPI (end users)
+
 ```bash
 pip install phrase-labeler
 ```
 
 ### For local development
+
 Create a virtual environment and install in editable mode (so changes to the source are immediately reflected):
 
 ```bash
 python -m venv venv
 venv\Scripts\activate
-pip install -e .[eval,mlflow]
+pip install -e .
 ```
 
-Set `OPENAI_API_KEY` in your environment or `.env` at the repo root (used by the eval harness).
+Set `OPENAI_API_KEY` in your environment or `.env` at the repo root.
 
-### Build the package (for distribution)
+### Build and publish the package
+
 ```bash
-python -m pip install build
+# Install build tools (one-time)
+pip install build twine
+
+# Build source distribution and wheel
 python -m build
+
+# Upload to PyPI
+twine upload dist/*
+
+# Or upload to TestPyPI first
+twine upload --repository testpypi dist/*
 ```
+
+The built artifacts appear in `dist/`. Increment `version` in `pyproject.toml` before each release.
 
 ## Command-Line Usage
 
-After installation, you can use the label-phrase command to label sentence segments. The syntax is as follows:
+After installation, you can use the `label-phrase` command to label sentence segments:
 
 ```bash
-label-phrase "[sentence segments as a JSON list]" "[your-openai-api-key]" [path-to-categories.json] [--use-defaults|--no-use-defaults] [--override-defaults] [--prompt-file path-to-prompt.txt]
+label-phrase "[sentence segments as a JSON list]" "[your-openai-api-key]" [--override-categories path-to-categories.json] [--prompt-file path-to-prompt.txt]
 ```
 
-If you omit the categories file, the default 0-8 categories are used. If you provide a categories file, it can be a JSON object that maps numeric keys to labels:
+**Categories:**
+
+- Omit `--override-categories` to use the built-in default categories (0–8).
+- Pass `--override-categories <file>` to use only the categories defined in that file (defaults are ignored entirely).
+
+A categories file is a JSON object with a `labels` map:
 
 ```json
 {
@@ -48,115 +67,60 @@ If you omit the categories file, the default 0-8 categories are used. If you pro
 }
 ```
 
-By default, custom categories are appended after the defaults. Use `--override-defaults` to replace the corresponding default labels for the numeric keys you supply, or `--no-use-defaults` to use only the provided labels.
+You can optionally include a top-level `description` field. Its value is injected into the prompt via the `${description}` placeholder, giving the model context about the category set:
 
-Example behaviors with defaults `[A, B, C]` and a file `{0: X, 2: Z}`:
-```
---use-defaults (default) -> [A, B, C, X, Z]
---no-use-defaults        -> [X, Z]   # requires contiguous keys from 0
---override-defaults      -> [X, B, Z]
-```
-
-## Evaluation Harness
-
-Use the standalone harness to evaluate prompts/models against a labeled dataset.
-
-Example:
-```bash
-python scripts/run_eval.py --config eval_config.example.json --api-key YOUR_KEY
-```
-You can force-enable or disable judge mode from CLI without editing config:
-```bash
-python scripts/run_eval.py --config eval_config.example.json --judge-enabled
-python scripts/run_eval.py --config eval_config.example.json --no-judge-enabled
-```
-
-The eval script also reads `.env` from the repo root, so you can set `OPENAI_API_KEY` there.
-
-The harness writes JSONL results and a summary JSON into a folder named by `run_name` under `eval_runs/` (filenames omit timestamps).
-
-Progress uses `tqdm` if installed (defaults to on), concurrency defaults to 1, and rate-limit retries use built-in defaults. These are intentionally not part of the experiment config.
-
-Each model entry can include optional reasoning effort:
 ```json
 {
-  "model": "gpt-5-mini",
-  "temperature": null,
-  "reasoning_effort": "high",
-  "n": 1
-}
-```
-`temperature` is optional; if omitted or `null`, it is not sent and the model/provider default is used.
-Allowed values for `reasoning_effort` are `null`, `low`, `medium`, `high`, and `xhigh`.
-
-If you provide `--prompt-file`, it should be a text file that uses `${sentence}`, `${categories}`, and optionally `${category_count}` placeholders. See `prompts/default.txt` for the default template.
-
-### Judge Correction Mode
-
-The harness supports an optional second-pass LLM judge that takes the model output and returns corrected labels in the same list shape.
-
-Add a `judge` block in config:
-```json
-{
-  "judge": {
-    "enabled": true,
-    "mode": "correct_labels",
-    "prompt_path": "prompts/judge/correct-labels.txt",
-    "system_prompt": null,
-    "fallback_to_base_on_error": true,
-    "model": {
-      "name": "gpt-4.1-mini-judge",
-      "model": "gpt-4.1-mini",
-      "temperature": null,
-      "reasoning_effort": null,
-      "n": 1
-    }
+  "description": "These categories describe the rhetorical structure of HCI research abstracts. 'Goal' refers to the stated objective of the study, 'Obstacle' refers to challenges the authors faced, etc.",
+  "labels": {
+    "0": "stakeholders",
+    "1": "setting",
+    "2": "goal",
+    "3": "obstacle",
+    "4": "constraints"
   }
 }
 ```
 
-When enabled, each JSONL record includes:
-- `predicted`: base model output
-- `judge_corrected`: judge-proposed corrected labels (if valid)
-- `final_predicted`: labels used for scoring (`judge_corrected` when available, otherwise base output)
-- `judge_error`: populated when correction fails/parsing fails
+**Custom prompt templates:**
 
-The evaluation report (`scripts/analyze_eval_results.py`) uses `final_predicted` when present.
+Pass `--prompt-file` with a `.txt` file using any of these placeholders:
 
-### Eval Analysis CLI
-
-Use the short CLI command:
-
-```bash
-analyze-eval eval_runs/singleshot-eval-judge
-```
-
-You can still use:
-
-```bash
-python scripts/analyze_eval_results.py eval_runs/singleshot-eval-judge
-```
-
-When you pass only a directory, defaults are:
-- HTML report output: `<that directory>/eval_analysis_report.html`
-- Metrics JSON output: `<that directory>/eval_analysis_metrics.json`
-- `min_wrong_runs`: `1`
-- `min_wrong_rate`: `25`
-
-You can override any default with flags such as `--output`, `--metrics-output`, `--min-wrong-runs`, and `--min-wrong-rate`.
-
-If judge mode was used in the eval JSONL, the analysis report includes judge impact metrics (improved vs worsened vs unchanged, plus net segment delta). If no judge-enabled records are present, judge-specific cards/columns/metrics are omitted.
+- `${sentence}` — the input segments as a JSON list
+- `${categories}` — the numbered category list
+- `${category_count}` — total number of categories
+- `${description}` — the category set description (empty string if not set)
 
 ## Testing
 
 ```bash
-python -m unittest -q
+python -m unittest tests/test_phrase_labeler.py -q
 ```
 
-## Module Layout
+## Package Layout
 
-- `phrase_labeler/cli.py`: CLI entry point and end-to-end labeling flow.
-- `phrase_labeler/prompting.py`: Prompt templating utilities and default categories.
-- `phrase_labeler/pipeline.py`: LLM plumbing, response extraction, and prompt pipeline helpers.
-- `prompts/`: Prompt templates for testing different prompt variations.
-- `categories/`: Category lists for testing different label sets.
+The `phrase_labeler/` package (what gets installed via pip) contains only the core labeling functionality:
+
+- `phrase_labeler/cli.py` — CLI entry point (`label-phrase` command)
+- `phrase_labeler/prompting.py` — prompt templating and default categories
+- `phrase_labeler/pipeline.py` — LLM communication and response caching
+- `phrase_labeler/categories.py` — category JSON loading
+
+## Research / Evaluation Tools
+
+The `eval/` directory contains research and evaluation tooling that is **not part of the pip package**. See [eval/README.md](eval/README.md) for full documentation.
+
+Quick start:
+
+```bash
+pip install -e .
+pip install tqdm          # required for eval
+pip install mlflow        # optional, for MLflow logging
+
+python eval/run_eval.py --config eval_config.json --api-key YOUR_KEY
+python -m eval.analyze_eval_results eval_runs/my-run/
+python -m eval.export_often_wrong_segments_csv eval_runs/my-run/
+python eval/log_to_mlflow.py --run-dir eval_runs/my-run/ --experiment-name my-experiment
+```
+
+Copy `eval_config.example.json` → `eval_config.json` and fill in your dataset path, label sets, prompt files, and models.

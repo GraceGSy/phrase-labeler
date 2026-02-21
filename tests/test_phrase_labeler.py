@@ -27,6 +27,7 @@ if "openai" not in sys.modules:
 import phrase_labeler.cli as cli
 import phrase_labeler.pipeline as pipeline
 import phrase_labeler.prompting as prompting
+from phrase_labeler.categories import load_categories, parse_categories_payload
 
 
 class FakeMessage:
@@ -90,6 +91,79 @@ class PromptBuildTests(unittest.TestCase):
         self.assertIn("1 Method", prompt)
         self.assertIn("Categories:", prompt)
 
+    def test_build_prompt_injects_description(self):
+        """Ensure ${description} placeholder is filled when description is provided."""
+        sentence = ["seg"]
+        categories = ["Cat"]
+        template = "Desc: ${description}\n${sentence}\n${categories}"
+        prompt = prompting.build_prompt(sentence, categories, template, description="My description")
+        self.assertIn("Desc: My description", prompt)
+
+    def test_build_prompt_empty_description_renders_blank(self):
+        """Ensure ${description} renders as empty string when not provided."""
+        sentence = ["seg"]
+        categories = ["Cat"]
+        template = "Desc: ${description}\n${sentence}\n${categories}"
+        prompt = prompting.build_prompt(sentence, categories, template)
+        self.assertIn("Desc: \n", prompt)
+
+
+class CategoryParsingTests(unittest.TestCase):
+    """Tests for category JSON parsing and description extraction."""
+
+    def test_parse_list_format_no_description(self):
+        """List format produces empty description."""
+        label_map, desc = parse_categories_payload(["A", "B"])
+        self.assertEqual(label_map, {0: "A", 1: "B"})
+        self.assertEqual(desc, "")
+
+    def test_parse_labels_object_with_description(self):
+        """Object with labels key and description field returns both."""
+        payload = {"description": "My category set", "labels": {"0": "A", "1": "B"}}
+        label_map, desc = parse_categories_payload(payload)
+        self.assertEqual(label_map, {0: "A", 1: "B"})
+        self.assertEqual(desc, "My category set")
+
+    def test_parse_labels_object_without_description(self):
+        """Object with labels key but no description returns empty string."""
+        payload = {"labels": {"0": "A", "1": "B"}}
+        label_map, desc = parse_categories_payload(payload)
+        self.assertEqual(label_map, {0: "A", 1: "B"})
+        self.assertEqual(desc, "")
+
+    def test_parse_legacy_object_no_description(self):
+        """Legacy object without labels key returns empty description."""
+        payload = {"0": "A", "1": "B"}
+        label_map, desc = parse_categories_payload(payload)
+        self.assertEqual(label_map, {0: "A", 1: "B"})
+        self.assertEqual(desc, "")
+
+    def test_load_categories_defaults_when_no_file(self):
+        """Returns defaults and empty description when no file is given."""
+        cats, desc = load_categories(None, defaults=["X", "Y"])
+        self.assertEqual(cats, ["X", "Y"])
+        self.assertEqual(desc, "")
+
+    def test_load_categories_from_file_with_description(self):
+        """Loads categories and description from a JSON file."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = os.path.join(tmpdir, "cats.json")
+            with open(path, "w") as handle:
+                json.dump({"description": "Test desc", "labels": {"0": "A", "1": "B"}}, handle)
+            cats, desc = load_categories(path, defaults=["X", "Y"])
+        self.assertEqual(cats, ["A", "B"])
+        self.assertEqual(desc, "Test desc")
+
+    def test_load_categories_from_file_without_description(self):
+        """Loads categories from a file with no description field."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = os.path.join(tmpdir, "cats.json")
+            with open(path, "w") as handle:
+                json.dump({"labels": {"0": "A", "1": "B"}}, handle)
+            cats, desc = load_categories(path, defaults=["X", "Y"])
+        self.assertEqual(cats, ["A", "B"])
+        self.assertEqual(desc, "")
+
 
 class ResponseExtractionTests(unittest.TestCase):
     """Tests for response extraction utilities."""
@@ -115,58 +189,51 @@ class FileValidationTests(unittest.TestCase):
 class CLITests(unittest.TestCase):
     """Tests for CLI argument handling."""
 
-    def test_main_uses_custom_categories_file(self):
-        """Use the supplied categories file when append is disabled."""
+    def test_main_uses_override_categories_file(self):
+        """Use the supplied categories file when --override-categories is passed."""
         with tempfile.TemporaryDirectory() as tmpdir:
             path = os.path.join(tmpdir, "cats.json")
             with open(path, "w") as handle:
                 json.dump({"labels": {"0": "A", "1": "B"}}, handle)
 
-            argv = ["label-phrase", '["seg"]', "test-key", path, "--no-use-defaults"]
+            argv = ["label-phrase", '["seg"]', "test-key", "--override-categories", path]
             with mock.patch.object(sys, "argv", argv):
                 with mock.patch.object(cli, "find_labels") as mock_find:
                     cli.main()
 
             mock_find.assert_called_once()
-            called_sentence, called_key, called_categories, called_prompt = mock_find.call_args[0]
+            called_sentence, called_key, called_categories, called_prompt, called_desc = mock_find.call_args[0]
             self.assertEqual(called_sentence, ["seg"])
             self.assertEqual(called_key, "test-key")
             self.assertEqual(called_categories, ["A", "B"])
             self.assertEqual(called_prompt, prompting.DEFAULT_PROMPT_TEMPLATE)
+            self.assertEqual(called_desc, "")
 
-    def test_main_appends_categories_by_default(self):
-        """Append user categories when no flags are provided."""
+    def test_main_uses_defaults_when_no_flag(self):
+        """Use default categories when --override-categories is not provided."""
+        argv = ["label-phrase", '["seg"]', "test-key"]
+        with mock.patch.object(sys, "argv", argv):
+            with mock.patch.object(cli, "find_labels") as mock_find:
+                cli.main()
+
+        mock_find.assert_called_once()
+        called_categories = mock_find.call_args[0][2]
+        self.assertEqual(called_categories, prompting.DEFAULT_CATEGORIES)
+
+    def test_main_passes_description_from_file(self):
+        """Description from the categories file is propagated to find_labels."""
         with tempfile.TemporaryDirectory() as tmpdir:
             path = os.path.join(tmpdir, "cats.json")
             with open(path, "w") as handle:
-                json.dump({"labels": {"0": "Extra"}}, handle)
+                json.dump({"description": "Test desc", "labels": {"0": "A"}}, handle)
 
-            argv = ["label-phrase", '["seg"]', "test-key", path]
+            argv = ["label-phrase", '["seg"]', "test-key", "--override-categories", path]
             with mock.patch.object(sys, "argv", argv):
                 with mock.patch.object(cli, "find_labels") as mock_find:
                     cli.main()
 
-            mock_find.assert_called_once()
-            called_categories = mock_find.call_args[0][2]
-            self.assertEqual(called_categories, prompting.DEFAULT_CATEGORIES + ["Extra"])
-
-    def test_main_overrides_default_categories(self):
-        """Override default categories when override is enabled."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            path = os.path.join(tmpdir, "cats.json")
-            with open(path, "w") as handle:
-                json.dump({"labels": {"1": "Override"}}, handle)
-
-            argv = ["label-phrase", '["seg"]', "test-key", path, "--override-defaults"]
-            with mock.patch.object(sys, "argv", argv):
-                with mock.patch.object(cli, "find_labels") as mock_find:
-                    cli.main()
-
-            mock_find.assert_called_once()
-            called_categories = mock_find.call_args[0][2]
-            expected = list(prompting.DEFAULT_CATEGORIES)
-            expected[1] = "Override"
-            self.assertEqual(called_categories, expected)
+        called_desc = mock_find.call_args[0][4]
+        self.assertEqual(called_desc, "Test desc")
 
     def test_main_uses_prompt_file(self):
         """Load the prompt template from the provided file."""
@@ -178,7 +245,7 @@ class CLITests(unittest.TestCase):
             with open(prompt_path, "w") as handle:
                 handle.write("Prompt: ${sentence}\n${categories}")
 
-            argv = ["label-phrase", '["seg"]', "test-key", cats_path, "--no-use-defaults", "--prompt-file", prompt_path]
+            argv = ["label-phrase", '["seg"]', "test-key", "--override-categories", cats_path, "--prompt-file", prompt_path]
             with mock.patch.object(sys, "argv", argv):
                 with mock.patch.object(cli, "find_labels") as mock_find:
                     cli.main()

@@ -3,7 +3,7 @@ import os
 import tempfile
 import unittest
 
-from phrase_labeler.eval_harness import _normalize_judge_config, _normalize_models, run_eval_from_config
+from eval.eval_harness import _normalize_judge_config, _normalize_models, run_eval_from_config
 
 
 class EvalHarnessTests(unittest.TestCase):
@@ -62,12 +62,9 @@ class EvalHarnessTests(unittest.TestCase):
                 "output_dir": output_dir,
                 "run_name": "unit_test_run",
                 "match_mode": "exact",
-                "use_defaults": False,
-                "override_defaults": False,
                 "label_sets": {
                     "need-thesis": {
                         "path": categories_path,
-                        "use_defaults": False
                     }
                 },
                 "prompt_sets": [
@@ -146,12 +143,9 @@ class EvalHarnessTests(unittest.TestCase):
                 "output_dir": os.path.join(tmpdir, "eval_runs"),
                 "run_name": "unit_test_run",
                 "match_mode": "exact",
-                "use_defaults": False,
-                "override_defaults": False,
                 "label_sets": {
                     "need-thesis": {
                         "path": categories_path,
-                        "use_defaults": False
                     }
                 },
                 "prompt_sets": [
@@ -248,12 +242,9 @@ class EvalHarnessTests(unittest.TestCase):
                 "output_dir": output_dir,
                 "run_name": "unit_test_judge_correction",
                 "match_mode": "exact",
-                "use_defaults": False,
-                "override_defaults": False,
                 "label_sets": {
                     "need-thesis": {
                         "path": categories_path,
-                        "use_defaults": False
                     }
                 },
                 "prompt_sets": [
@@ -359,12 +350,9 @@ class EvalHarnessTests(unittest.TestCase):
                 "output_dir": output_dir,
                 "run_name": "unit_test_judge_fallback",
                 "match_mode": "exact",
-                "use_defaults": False,
-                "override_defaults": False,
                 "label_sets": {
                     "need-thesis": {
                         "path": categories_path,
-                        "use_defaults": False
                     }
                 },
                 "prompt_sets": [
@@ -454,12 +442,9 @@ class EvalHarnessTests(unittest.TestCase):
                 "output_dir": output_dir,
                 "run_name": "unit_test_judge_override",
                 "match_mode": "exact",
-                "use_defaults": False,
-                "override_defaults": False,
                 "label_sets": {
                     "need-thesis": {
                         "path": categories_path,
-                        "use_defaults": False
                     }
                 },
                 "prompt_sets": [

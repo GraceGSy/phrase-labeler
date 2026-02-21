@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from phrase_labeler.analyze_eval_results import (
+from eval.analyze_eval_results import (
     DEFAULT_METRICS_FILENAME,
     DEFAULT_MIN_WRONG_RATE,
     DEFAULT_MIN_WRONG_RUNS,

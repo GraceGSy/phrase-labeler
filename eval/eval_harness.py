@@ -12,8 +12,8 @@ try:
 except ImportError:  # pragma: no cover - optional dependency
     tqdm = None
 
-from .categories import load_categories
-from .prompting import DEFAULT_CATEGORIES, build_prompt, format_categories, format_sentence
+from phrase_labeler.categories import load_categories
+from phrase_labeler.prompting import DEFAULT_CATEGORIES, build_prompt, format_categories, format_sentence
 
 ALLOWED_REASONING_EFFORTS = {"low", "medium", "high", "xhigh"}
 
@@ -259,23 +259,15 @@ def _normalize_judge_config(judge: Optional[dict], base_dir: str) -> dict:
     return normalized
 
 
-def _normalize_label_sets(label_sets: Dict, base_dir: str, defaults: dict) -> dict:
+def _normalize_label_sets(label_sets: Dict, base_dir: str) -> dict:
     normalized = {}
     for type_id, entry in label_sets.items():
         if isinstance(entry, str):
-            normalized[type_id] = {
-                "path": _resolve_path(base_dir, entry),
-                "use_defaults": defaults["use_defaults"],
-                "override_defaults": defaults["override_defaults"],
-            }
+            normalized[type_id] = {"path": _resolve_path(base_dir, entry)}
             continue
         if not isinstance(entry, dict) or "path" not in entry:
             raise ValueError("Each label set must be a string path or an object with a 'path' field.")
-        normalized[type_id] = {
-            "path": _resolve_path(base_dir, entry["path"]),
-            "use_defaults": entry.get("use_defaults", defaults["use_defaults"]),
-            "override_defaults": entry.get("override_defaults", defaults["override_defaults"]),
-        }
+        normalized[type_id] = {"path": _resolve_path(base_dir, entry["path"])}
     return normalized
 
 
@@ -285,6 +277,7 @@ def _build_judge_prompt(
     segments: list[str],
     categories: list[str],
     predicted: list[int],
+    description: str = "",
 ) -> str:
     return Template(prompt_template).safe_substitute({
         "text": "" if text is None else str(text),
@@ -295,6 +288,7 @@ def _build_judge_prompt(
         "category_max": len(categories) - 1 if categories else -1,
         "predicted": json.dumps(predicted, ensure_ascii=False),
         "predicted_pretty": json.dumps(predicted, ensure_ascii=False, indent=2),
+        "description": description,
     })
 
 
@@ -374,10 +368,6 @@ def run_eval_from_config(
     if not run_name or not isinstance(run_name, str):
         raise ValueError("Config must include a non-empty 'run_name' string.")
 
-    defaults = {
-        "use_defaults": config.get("use_defaults", True),
-        "override_defaults": config.get("override_defaults", False),
-    }
     match_mode = config.get("match_mode", "exact")
     retry_config = {
         "max_retries": 3,
@@ -391,7 +381,7 @@ def run_eval_from_config(
 
     prompt_sets_norm = _normalize_prompt_sets(prompt_sets, base_dir)
     models_norm = _normalize_models(models)
-    label_sets_norm = _normalize_label_sets(label_sets, base_dir, defaults)
+    label_sets_norm = _normalize_label_sets(label_sets, base_dir)
     judge_config_input = config.get("judge")
     if judge_enabled is not None:
         if judge_config_input is None:
@@ -417,13 +407,11 @@ def run_eval_from_config(
     output_files = []
 
     categories_by_type: Dict[str, list[str]] = {}
+    descriptions_by_type: Dict[str, str] = {}
     for type_id, label_cfg in label_sets_norm.items():
-        categories_by_type[type_id] = load_categories(
-            label_cfg["path"],
-            use_defaults=label_cfg["use_defaults"],
-            override=label_cfg["override_defaults"],
-            defaults=DEFAULT_CATEGORIES,
-        )
+        cats, desc = load_categories(label_cfg["path"], defaults=DEFAULT_CATEGORIES)
+        categories_by_type[type_id] = cats
+        descriptions_by_type[type_id] = desc
 
     judge_prompt_template = None
     if judge_cfg["enabled"]:
@@ -487,7 +475,7 @@ def run_eval_from_config(
                 segments = list(segments_map.keys())
                 expected = list(segments_map.values())
 
-                prompt = build_prompt(segments, categories_by_type[type_id], prompt_text)
+                prompt = build_prompt(segments, categories_by_type[type_id], prompt_text, descriptions_by_type[type_id])
                 raw_responses = []
                 predicted: list[int] = []
                 final_predicted: list[int] = []
@@ -521,6 +509,7 @@ def run_eval_from_config(
                             segments=segments,
                             categories=categories_by_type[type_id],
                             predicted=predicted,
+                            description=descriptions_by_type[type_id],
                         )
                         judge_raw_responses, judge_error = call_with_retry(
                             prompt_text=judge_prompt,
@@ -684,7 +673,6 @@ def run_eval_from_config(
                 "prompt_set": prompt_set,
                 "model": model_cfg,
                 "judge": judge_cfg,
-                "defaults": defaults,
                 "match_mode": match_mode,
             }
             with open(config_snapshot_path, "w", encoding="utf-8") as handle:

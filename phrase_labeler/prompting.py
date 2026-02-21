@@ -141,6 +141,7 @@ DEFAULT_CATEGORIES = [
 
 
 DEFAULT_PROMPT_TEMPLATE = """A sentence (from a paper abstract) was splitted into several segments, put into the following list. For each list element, please classify it into one of the ${category_count} categories below, based on what it describes.
+${description}
 ${sentence}
 
 Categories:
@@ -163,8 +164,13 @@ def build_prompt(
     sentence_list: list[str],
     categories: list[str],
     prompt_template: str = DEFAULT_PROMPT_TEMPLATE,
+    description: str = "",
 ) -> str:
-    """Construct a classification prompt by filling a template with segments and categories."""
+    """Construct a classification prompt by filling a template with segments and categories.
+
+    The template may use ${description} to include an optional category-set description.
+    If description is empty, ${description} renders as an empty string.
+    """
     category_text = format_categories(categories)
     formatted_sentence = format_sentence(sentence_list)
 
@@ -172,4 +178,5 @@ def build_prompt(
         "sentence": formatted_sentence,
         "categories": category_text,
         "category_count": len(categories),
+        "description": description,
     })

@@ -3,12 +3,13 @@ import json
 import os
 import sys
 
-REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+EVAL_DIR = os.path.dirname(os.path.abspath(__file__))
+REPO_ROOT = os.path.dirname(EVAL_DIR)
 if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
-from phrase_labeler.eval_harness import run_eval_from_config
-from phrase_labeler.mlflow_logger import log_run_dir_to_mlflow
+from eval.eval_harness import run_eval_from_config
+from eval.mlflow_logger import log_run_dir_to_mlflow
 
 
 def _strip_quotes(value: str) -> str:

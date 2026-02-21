@@ -6,8 +6,8 @@ from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .categories import load_categories
-from .prompting import DEFAULT_CATEGORIES
+from phrase_labeler.categories import load_categories
+from phrase_labeler.prompting import DEFAULT_CATEGORIES
 
 DEFAULT_OUTPUT_FILENAME = "eval_analysis_report.html"
 DEFAULT_METRICS_FILENAME = "eval_analysis_metrics.json"
@@ -89,7 +89,6 @@ def load_labels_for_jsonl(jsonl_path):
         return labels, warnings
 
     label_sets = payload.get("label_sets")
-    defaults = payload.get("defaults", {}) if isinstance(payload.get("defaults"), dict) else {}
     if not isinstance(label_sets, dict):
         warnings.append(f"Config missing label_sets: {cfg}")
         return labels, warnings
@@ -98,18 +97,12 @@ def load_labels_for_jsonl(jsonl_path):
         if not isinstance(entry, dict) or not isinstance(entry.get("path"), str):
             warnings.append(f"Invalid label set entry for {type_id} in {cfg}")
             continue
-        use_defaults = bool(entry.get("use_defaults", defaults.get("use_defaults", True)))
-        override_defaults = bool(entry.get("override_defaults", defaults.get("override_defaults", False)))
         label_path = Path(entry["path"])
         if not label_path.is_absolute():
             label_path = (cfg.parent / label_path).resolve()
         try:
-            labels[type_id] = load_categories(
-                str(label_path),
-                use_defaults=use_defaults,
-                override=override_defaults,
-                defaults=DEFAULT_CATEGORIES,
-            )
+            cats, _ = load_categories(str(label_path), defaults=DEFAULT_CATEGORIES)
+            labels[type_id] = cats
         except Exception as exc:
             warnings.append(f"Failed loading labels for {type_id} ({label_path}): {exc}")
     return labels, warnings

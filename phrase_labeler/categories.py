@@ -1,5 +1,5 @@
 import json
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 
 
 def normalize_label_map(raw_labels: Dict) -> Dict[int, str]:
@@ -34,41 +34,32 @@ def labels_from_map(label_map: Dict[int, str], require_contiguous: bool) -> list
     return [label_map[idx] for idx in keys_sorted]
 
 
-def parse_categories_payload(payload) -> Dict[int, str]:
-    """Parse category JSON into a label map."""
+def parse_categories_payload(payload) -> Tuple[Dict[int, str], str]:
+    """Parse category JSON into a (label_map, description) tuple.
+
+    Supported formats:
+      - List:  ["Cat A", "Cat B"]  — no description
+      - Object with labels key:  {"description": "...", "labels": {"0": "Cat A"}}
+      - Legacy object (no labels key):  {"0": "Cat A", "1": "Cat B"}  — no description
+    """
     if isinstance(payload, list):
         if not all(isinstance(c, str) for c in payload):
             raise ValueError("The categories list must contain strings only.")
-        return {i: c for i, c in enumerate(payload)}
+        return {i: c for i, c in enumerate(payload)}, ""
 
     if isinstance(payload, dict):
-        raw_labels = payload.get("labels", payload)
-        return normalize_label_map(raw_labels)
+        if "labels" in payload:
+            desc = payload.get("description", "")
+            description = desc if isinstance(desc, str) else ""
+            return normalize_label_map(payload["labels"]), description
+        # Legacy format: entire object is the label map
+        return normalize_label_map(payload), ""
 
     raise ValueError("The categories file must contain a JSON list or an object mapping numeric keys to labels.")
 
 
-def merge_categories(
-    defaults: list[str],
-    label_map: Dict[int, str],
-    use_defaults: bool,
-    override: bool,
-) -> list[str]:
-    """Merge user categories with defaults based on flags."""
-    if override:
-        categories = list(defaults)
-        for idx, label in label_map.items():
-            if idx >= len(categories):
-                raise ValueError("Override label index out of range for default categories.")
-            categories[idx] = label
-        return categories
-    if use_defaults:
-        return list(defaults) + labels_from_map(label_map, require_contiguous=False)
-    return labels_from_map(label_map, require_contiguous=True)
-
-
-def load_label_map(categories_file: str) -> Dict[int, str]:
-    """Load a categories file and return a label map."""
+def load_label_map(categories_file: str) -> Tuple[Dict[int, str], str]:
+    """Load a categories file and return (label_map, description)."""
     with open(categories_file, "r", encoding="utf-8") as handle:
         payload = json.load(handle)
     return parse_categories_payload(payload)
@@ -76,15 +67,18 @@ def load_label_map(categories_file: str) -> Dict[int, str]:
 
 def load_categories(
     categories_file: Optional[str],
-    use_defaults: bool,
-    override: bool,
     defaults: Optional[list[str]] = None,
-) -> list[str]:
-    """Load categories from disk and merge with defaults based on flags."""
+) -> Tuple[list[str], str]:
+    """Load categories from a file, or return defaults if no file is given.
+
+    Returns (categories, description).  description is "" when not specified
+    in the file or when falling back to defaults.
+
+    Pass categories_file=None to use the hardcoded defaults.
+    Pass a path to use only that file's categories (keys must be contiguous from 0).
+    """
     defaults = defaults or []
     if not categories_file:
-        return list(defaults)
-    label_map = load_label_map(categories_file)
-    if override:
-        use_defaults = True
-    return merge_categories(defaults, label_map, use_defaults, override)
+        return list(defaults), ""
+    label_map, description = load_label_map(categories_file)
+    return labels_from_map(label_map, require_contiguous=True), description

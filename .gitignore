@@ -219,6 +219,12 @@ __marimo__/
 
 eval_runs/
 
+# Claude Code context file
+CLAUDE.md
+
+# Development notes
+Updates.MD
+
 .vscode/
 
 # Ignore eval_config.json, but keep eval_config.example.json

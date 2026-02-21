@@ -3,20 +3,15 @@
   "output_dir": "eval_runs",
   "run_name": "baseline_eval",
   "match_mode": "exact",
-  "use_defaults": false,
-  "override_defaults": false,
   "label_sets": {
     "need-thesis": {
-      "path": "categories/need.json",
-      "use_defaults": false
+      "path": "categories/need.json"
     },
     "approach-thesis": {
-      "path": "categories/approach.json",
-      "use_defaults": false
+      "path": "categories/approach.json"
     },
     "novelty-thesis": {
-      "path": "categories/novelty.json",
-      "use_defaults": false
+      "path": "categories/novelty.json"
     }
   },
   "prompt_sets": [

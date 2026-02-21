@@ -24,13 +24,13 @@ def _load_prompt_template(prompt_file: Optional[str]) -> str:
         return handle.read()
 
 
-def find_labels(segmented_sent, k, categories, prompt_template=None):
+def find_labels(segmented_sent, k, categories, prompt_template=None, description=""):
     """Classify each segment and print a labeled list to stdout."""
     output = []
     openai.api_key = k
     if prompt_template is None:
         prompt_template = DEFAULT_PROMPT_TEMPLATE
-    filled_prompt = build_prompt(segmented_sent, categories, prompt_template)
+    filled_prompt = build_prompt(segmented_sent, categories, prompt_template, description)
     phrase_tagger = Phrase_TaggerPromptPipeline(filled_prompt)
     tmp = []
     phrase_tagger.clear_cached_responses()
@@ -54,23 +54,13 @@ def main():
     parser.add_argument("sentence", type=json.loads,
                         help="The sentence segments as a JSON list of strings (e.g. '[\"This paper\", \"proposes a method\"]')")
     parser.add_argument("api_key", help="Your OpenAI API key")
-    parser.add_argument("categories_file", type=str, nargs="?",
-                        help="Optional path to JSON file containing a category list")
-    parser.add_argument("--use-defaults", action=argparse.BooleanOptionalAction, default=True,
-                        help="Include default categories before your custom labels (default: true).")
-    parser.add_argument("--override-defaults", action="store_true",
-                        help="Replace default labels at the provided indices.")
+    parser.add_argument("--override-categories", type=str, metavar="FILE",
+                        help="Path to a JSON file with categories to use instead of the defaults")
     parser.add_argument("--prompt-file", type=str,
                         help="Optional path to a prompt template file")
 
     args = parser.parse_args()
 
-    categories = load_categories(
-        args.categories_file,
-        use_defaults=args.use_defaults,
-        override=args.override_defaults,
-        defaults=DEFAULT_CATEGORIES,
-    )
-
+    categories, description = load_categories(args.override_categories, defaults=DEFAULT_CATEGORIES)
     prompt_template = _load_prompt_template(args.prompt_file)
-    find_labels(args.sentence, args.api_key, categories, prompt_template)
+    find_labels(args.sentence, args.api_key, categories, prompt_template, description)
