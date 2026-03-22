@@ -12,7 +12,8 @@ dependencies = [
   "openai",
 ]
 authors = [
-  { name = "Ziwei Gu", email = "ziweigu@g.harvard.edu" }
+  { name = "Ziwei Gu", email = "ziweigu@g.harvard.edu" },
+  { name = "Kanishk Tantia", email = "ktantia@g.harvard.edu" }
 ]
 license = { file = "LICENSE" }
 classifiers = [

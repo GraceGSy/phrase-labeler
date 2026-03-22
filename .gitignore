@@ -215,17 +215,24 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
+# OS
 .DS_Store
+Thumbs.db
+Desktop.ini
 
+# IDE
+.vscode/
+.idea/
+
+# Eval outputs
 eval_runs/
 
-# Claude Code context file
+# Claude Code
+.claude/
 CLAUDE.md
 
 # Development notes
 Updates.MD
-
-.vscode/
 
 # Ignore eval_config.json, but keep eval_config.example.json
 eval_config.json

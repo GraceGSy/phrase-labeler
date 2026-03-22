@@ -24,17 +24,45 @@ def _load_prompt_template(prompt_file: Optional[str]) -> str:
         return handle.read()
 
 
-def find_labels(segmented_sent, k, categories, prompt_template=None, description=""):
-    """Classify each segment and print a labeled list to stdout."""
+def find_labels(
+    segmented_sent,
+    k,
+    categories,
+    prompt_template=None,
+    description="",
+    model: Optional[str] = None,
+    temperature: Optional[float] = None,
+    reasoning_effort: Optional[str] = None,
+):
+    """Classify each segment and return a labeled list.
+
+    Parameters
+    ----------
+    model : str, optional
+        OpenAI model name. Defaults to gpt-3.5-turbo when not provided.
+    temperature : float, optional
+        Sampling temperature. Ignored when reasoning_effort is set.
+    reasoning_effort : str, optional
+        Reasoning effort level (low/medium/high/xhigh) for reasoning models.
+    """
     output = []
     openai.api_key = k
     if prompt_template is None:
         prompt_template = DEFAULT_PROMPT_TEMPLATE
+    if temperature is None:
+        temperature = TEMPERATURE
     filled_prompt = build_prompt(segmented_sent, categories, prompt_template, description)
     phrase_tagger = Phrase_TaggerPromptPipeline(filled_prompt)
     tmp = []
     phrase_tagger.clear_cached_responses()
-    for res in phrase_tagger.gen_responses({"sentence": str(segmented_sent)}, LLM.ChatGPT, n=1, temperature=TEMPERATURE):
+    for res in phrase_tagger.gen_responses(
+        {"sentence": str(segmented_sent)},
+        LLM.ChatGPT,
+        n=1,
+        temperature=temperature,
+        model=model,
+        reasoning_effort=reasoning_effort,
+    ):
         tmp.extend(extract_responses(res, llm=LLM.ChatGPT))
     color_list = ast.literal_eval(tmp[0])
     if len(color_list) == len(segmented_sent):
@@ -46,6 +74,7 @@ def find_labels(segmented_sent, k, categories, prompt_template=None, description
         for j, segment in enumerate(segmented_sent):
             output.append({'text': segment, 'label': 0})
     print(output)
+    return output
 
 
 def main():

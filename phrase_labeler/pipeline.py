@@ -28,19 +28,29 @@ class LLM(Enum):
     ChatGPT = 0
 
 
-def call_chatgpt(prompt: str, n: int = 1, temperature: float = 1.0) -> Tuple[Dict, Dict]:
+def call_chatgpt(
+    prompt: str,
+    n: int = 1,
+    temperature: float = 1.0,
+    model: str = "gpt-3.5-turbo",
+    reasoning_effort: str | None = None,
+) -> Tuple[Dict, Dict]:
     """Send a prompt to the ChatGPT API and return the query and response objects."""
     query = {
-        "model": "gpt-3.5-turbo", #TODO: Change model
+        "model": model,
         "messages": [
             {"role": "system", "content": "You are a helpful assistant."},
             {"role": "user", "content": prompt},
         ],
         "n": n,
-        "temperature": temperature,
     }
-    client = OpenAI(api_key=openai.api_key)
+    # Reasoning models don't support temperature; only set it for non-reasoning calls
+    if reasoning_effort is not None:
+        query["reasoning_effort"] = reasoning_effort
+    else:
+        query["temperature"] = temperature
 
+    client = OpenAI(api_key=openai.api_key)
     response = client.chat.completions.create(**query)
     return query, response
 
@@ -114,7 +124,15 @@ class PromptPipeline:
         """
         raise NotImplementedError("Please Implement the analyze_response method")
 
-    def gen_responses(self, properties, llm: LLM, n: int = 1, temperature: float = 1.0) -> Iterator[Dict]:
+    def gen_responses(
+        self,
+        properties,
+        llm: LLM,
+        n: int = 1,
+        temperature: float = 1.0,
+        model: str | None = None,
+        reasoning_effort: str | None = None,
+    ) -> Iterator[Dict]:
         """
             Calls LLM 'llm' with all prompts, and yields responses as dicts in format {prompt, query, response, llm, info}.
 
@@ -157,7 +175,10 @@ class PromptPipeline:
                 continue
 
             # Call the LLM to generate a response
-            query, response = self._prompt_llm(llm, prompt_str, n, temperature)
+            query, response = self._prompt_llm(
+                llm, prompt_str, n, temperature,
+                model=model, reasoning_effort=reasoning_effort,
+            )
 
             # Save the response to a JSON file
             # NOTE: We do this to save money --in case something breaks between calls, can ensure we got the data!
@@ -198,10 +219,23 @@ class PromptPipeline:
         """Clear any cached responses stored on disk."""
         self._cache_responses({})
 
-    def _prompt_llm(self, llm: LLM, prompt: str, n: int = 1, temperature: float = 1.0) -> Tuple[Dict, Dict]:
+    def _prompt_llm(
+        self,
+        llm: LLM,
+        prompt: str,
+        n: int = 1,
+        temperature: float = 1.0,
+        model: str | None = None,
+        reasoning_effort: str | None = None,
+    ) -> Tuple[Dict, Dict]:
         """Dispatch a prompt to the configured language model."""
         if llm is LLM.ChatGPT:
-            return call_chatgpt(prompt, n=n, temperature=temperature)
+            kwargs = {"n": n, "temperature": temperature}
+            if model is not None:
+                kwargs["model"] = model
+            if reasoning_effort is not None:
+                kwargs["reasoning_effort"] = reasoning_effort
+            return call_chatgpt(prompt, **kwargs)
         else:
             raise Exception(f"Language model {llm} is not supported.")
 
