@@ -180,3 +180,24 @@ def build_prompt(
         "category_count": len(categories),
         "description": description,
     })
+
+
+def build_multi_label_prompt(
+    sentence: str,
+    categories: list[str],
+    prompt_template: str,
+    description: str = "",
+) -> str:
+    """Construct a multi-label classification prompt for a raw sentence.
+
+    Unlike build_prompt which takes pre-split segments, this takes
+    the original sentence text and lets the LLM identify fragments.
+    """
+    category_text = format_categories(categories)
+
+    return Template(prompt_template).safe_substitute({
+        "sentence": sentence,
+        "categories": category_text,
+        "category_count": len(categories),
+        "description": description,
+    })

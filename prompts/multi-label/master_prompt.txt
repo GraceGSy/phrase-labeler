@@ -1,0 +1,69 @@
+You are an expert in linguistics and natural language processing with decades of experience analyzing academic writing.
+
+Given a sentence from a paper abstract and a set of category labels, identify all meaningful text fragments and classify each fragment into exactly one category. Fragments may overlap — the same words can appear in multiple fragments with different labels. This captures how a single word or phrase can serve different roles depending on the surrounding context.
+
+For each fragment, return a JSON object with:
+- "text": the exact substring from the sentence being labeled
+- "context": a longer surrounding substring that uniquely identifies where this fragment appears in the sentence (used for disambiguation when the same text appears multiple times)
+- "label": the category number (integer) that best describes this fragment
+
+If a portion of the sentence does not fit any category, include it with label -1.
+
+Return a JSON array of these objects. Every word in the sentence should be covered by at least one fragment.
+
+${description}
+
+## Example 1: Overlapping labels
+
+Sentence: "DynaVis addresses this challenge by blending natural language input with dynamically generated widgets that allow users to refine edits."
+
+Categories:
+0 Artifact
+1 Method
+2 Contribution
+3 Interaction
+
+Output:
+```json
+[
+  {"text": "DynaVis", "context": "DynaVis addresses this challenge", "label": 0},
+  {"text": "addresses this challenge", "context": "DynaVis addresses this challenge by", "label": 2},
+  {"text": "by blending natural language input", "context": "challenge by blending natural language input with", "label": 1},
+  {"text": "with dynamically generated widgets", "context": "input with dynamically generated widgets that", "label": 0},
+  {"text": "that allow users to refine edits", "context": "widgets that allow users to refine edits", "label": 3},
+  {"text": "DynaVis addresses this challenge by blending", "context": "DynaVis addresses this challenge by blending natural", "label": 1}
+]
+```
+
+Notice how "addresses" appears in two fragments: once as part of "addresses this challenge" (Contribution) and once as part of the larger phrase "DynaVis addresses this challenge by blending" (Method). This is correct — the same words can serve different roles.
+
+## Example 2: Unlabeled content
+
+Sentence: "In this paper, we present a novel clustering algorithm for large-scale datasets."
+
+Categories:
+0 Artifact
+1 Method
+
+Output:
+```json
+[
+  {"text": "In this paper,", "context": "In this paper, we present", "label": -1},
+  {"text": "we present", "context": "this paper, we present a novel", "label": -1},
+  {"text": "a novel clustering algorithm", "context": "present a novel clustering algorithm for", "label": 0},
+  {"text": "for large-scale datasets", "context": "algorithm for large-scale datasets", "label": -1}
+]
+```
+
+Here, "In this paper," and "we present" are rhetorical scaffolding that do not fit Artifact or Method, so they receive label -1.
+
+---
+
+Now classify the following:
+
+Sentence: "${sentence}"
+
+Categories:
+${categories}
+
+Output:
