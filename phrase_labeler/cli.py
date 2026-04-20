@@ -11,6 +11,7 @@ from .categories import load_categories
 from .pipeline import LLM, Phrase_TaggerPromptPipeline, extract_responses
 from .prompting import (
     DEFAULT_CATEGORIES,
+    DEFAULT_MULTI_LABEL_PROMPT_TEMPLATE,
     DEFAULT_PROMPT_TEMPLATE,
     build_multi_label_prompt,
     build_prompt,
@@ -20,14 +21,30 @@ from .prompting import (
 TEMPERATURE = 0.2 #The temperature for ChatGPT calls
 
 
-def _load_prompt_template(prompt_file: Optional[str]) -> str:
-    """Load a prompt template from disk or return the default."""
+def _load_prompt_template(prompt_file: Optional[str]) -> Optional[str]:
+    """Load a prompt template from disk, or return None to signal the default."""
     if not prompt_file:
-        return DEFAULT_PROMPT_TEMPLATE
+        return None
     if not os.path.exists(prompt_file):
         raise FileNotFoundError(f"File not found: {prompt_file}")
     with open(prompt_file, "r", encoding="utf-8") as handle:
         return handle.read()
+
+
+def _load_negative_examples(path: Optional[str]) -> list[dict]:
+    """Load a JSON file of negative examples, or return an empty list."""
+    if not path:
+        return []
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"Negative examples file not found: {path}")
+    with open(path, "r", encoding="utf-8") as handle:
+        payload = json.load(handle)
+    if not isinstance(payload, list):
+        raise ValueError(
+            "Negative examples file must contain a JSON array of "
+            '{"sentence", "segment_text", "do_not_label_as"} objects.'
+        )
+    return payload
 
 
 def _strip_code_fences(text: str) -> str:
@@ -132,6 +149,7 @@ def find_labels(
     model: Optional[str] = None,
     temperature: Optional[float] = None,
     reasoning_effort: Optional[str] = None,
+    negative_examples: Optional[list[dict]] = None,
 ):
     """Classify each segment and return a labeled list (legacy single-label API).
 
@@ -143,6 +161,9 @@ def find_labels(
         Sampling temperature. Ignored when reasoning_effort is set.
     reasoning_effort : str, optional
         Reasoning effort level (low/medium/high/xhigh) for reasoning models.
+    negative_examples : list of dict, optional
+        User-supplied {"sentence", "segment_text", "do_not_label_as"} hints
+        that are prepended to the prompt as calibration signal.
     """
     output = []
     openai.api_key = k
@@ -150,7 +171,10 @@ def find_labels(
         prompt_template = DEFAULT_PROMPT_TEMPLATE
     if temperature is None:
         temperature = TEMPERATURE
-    filled_prompt = build_prompt(segmented_sent, categories, prompt_template, description)
+    filled_prompt = build_prompt(
+        segmented_sent, categories, prompt_template, description,
+        negative_examples=negative_examples,
+    )
     phrase_tagger = Phrase_TaggerPromptPipeline(filled_prompt)
     tmp = []
     phrase_tagger.clear_cached_responses()
@@ -180,16 +204,28 @@ def find_labels_multi(
     sentence: str,
     api_key: str,
     categories: list[str],
-    prompt_template: str,
+    prompt_template: Optional[str] = None,
     description: str = "",
     model: Optional[str] = None,
     temperature: Optional[float] = None,
     reasoning_effort: Optional[str] = None,
+    category_descriptions: list[str] | None = None,
+    negative_examples: Optional[list[dict]] = None,
 ) -> list[dict]:
     """Classify a raw sentence into overlapping labeled spans (multi-label API).
 
     Unlike find_labels which takes pre-split segments, this takes the original
     sentence and returns overlapping spans with resolved character offsets.
+
+    Parameters
+    ----------
+    prompt_template : str, optional
+        Full prompt template string. If None, the packaged
+        DEFAULT_MULTI_LABEL_PROMPT_TEMPLATE is used.
+    negative_examples : list of dict, optional
+        User-supplied {"sentence", "segment_text", "do_not_label_as"} hints
+        prepended to the prompt. These instruct the model to avoid the
+        specified label for the given sentence/segment pair.
 
     Returns
     -------
@@ -202,6 +238,8 @@ def find_labels_multi(
 
     filled_prompt = build_multi_label_prompt(
         sentence, categories, prompt_template, description,
+        category_descriptions=category_descriptions,
+        negative_examples=negative_examples,
     )
     phrase_tagger = Phrase_TaggerPromptPipeline(filled_prompt)
     tmp = []
@@ -236,17 +274,28 @@ def main():
                         help="Optional path to a prompt template file")
     parser.add_argument("--multi-label", action="store_true",
                         help="Use multi-label overlapping span mode instead of legacy single-label")
+    parser.add_argument("--negative-examples", type=str, metavar="FILE",
+                        help="Path to a JSON file of user-marked negative examples "
+                             "(list of {sentence, segment_text, do_not_label_as})")
 
     args = parser.parse_args()
 
     categories, description = load_categories(args.override_categories, defaults=DEFAULT_CATEGORIES)
     prompt_template = _load_prompt_template(args.prompt_file)
+    negative_examples = _load_negative_examples(args.negative_examples)
 
     if args.multi_label:
         result = find_labels_multi(
             args.sentence, args.api_key, categories, prompt_template, description,
+            negative_examples=negative_examples,
         )
         print(json.dumps(result, indent=2))
     else:
         segments = json.loads(args.sentence)
-        find_labels(segments, args.api_key, categories, prompt_template, description)
+        # Pass the single-label default explicitly; None would leave the template at
+        # the multi-label default which does not fit the single-label API surface.
+        template = prompt_template if prompt_template is not None else DEFAULT_PROMPT_TEMPLATE
+        find_labels(
+            segments, args.api_key, categories, template, description,
+            negative_examples=negative_examples,
+        )

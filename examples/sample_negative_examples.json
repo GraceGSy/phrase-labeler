@@ -1,0 +1,17 @@
+[
+  {
+    "sentence": "When editing visualizations users face difficulty in navigating complex GUIs or are limited by overly tailored interfaces.",
+    "segment_text": "When editing visualizations",
+    "do_not_label_as": "Setting"
+  },
+  {
+    "sentence": "DynaVis proposes a hybrid solution: natural language instructions initiate edits, and synthesized widgets enable further exploration with confidence.",
+    "segment_text": "DynaVis proposes a hybrid solution",
+    "do_not_label_as": "Contribution"
+  },
+  {
+    "sentence": "Traditional GUIs and pure NLIs both fail to fully support flexible, user-friendly editing of visualizations.",
+    "segment_text": "Traditional GUIs and pure NLIs both fail to fully support flexible, user-friendly editing of visualizations",
+    "do_not_label_as": "Obstacle"
+  }
+]

@@ -57,6 +57,7 @@ Output:
 
 Here, "In this paper," and "we present" are rhetorical scaffolding that do not fit Artifact or Method, so they receive label -1.
 
+${negative_examples}
 ---
 
 Now classify the following:

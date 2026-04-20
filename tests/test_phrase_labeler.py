@@ -108,6 +108,81 @@ class PromptBuildTests(unittest.TestCase):
         self.assertIn("Desc: \n", prompt)
 
 
+class NegativeExamplesTests(unittest.TestCase):
+    """Tests for formatting and wiring negative examples into prompts."""
+
+    def test_format_negative_examples_empty_returns_blank(self):
+        """No examples should produce an empty section so the prompt stays clean."""
+        self.assertEqual(prompting.format_negative_examples(None), "")
+        self.assertEqual(prompting.format_negative_examples([]), "")
+
+    def test_format_negative_examples_renders_each_triple(self):
+        """Each example is rendered with its sentence, segment, and forbidden label."""
+        examples = [
+            {
+                "sentence": "When editing visualizations users face difficulty.",
+                "segment_text": "When editing visualizations",
+                "do_not_label_as": "Setting",
+            },
+            {
+                "sentence": "DynaVis proposes a hybrid solution.",
+                "segment_text": "DynaVis proposes a hybrid solution",
+                "do_not_label_as": "Contribution",
+            },
+        ]
+        rendered = prompting.format_negative_examples(examples)
+        self.assertIn("User corrections", rendered)
+        self.assertIn('Segment: "When editing visualizations"', rendered)
+        self.assertIn("Do NOT label this segment as: Setting", rendered)
+        self.assertIn('Segment: "DynaVis proposes a hybrid solution"', rendered)
+        self.assertIn("Do NOT label this segment as: Contribution", rendered)
+
+    def test_format_negative_examples_skips_malformed(self):
+        """Examples missing segment_text or do_not_label_as should be skipped silently."""
+        examples = [
+            {"sentence": "A", "segment_text": "", "do_not_label_as": "Goal"},
+            {"sentence": "B", "segment_text": "something", "do_not_label_as": ""},
+            {"sentence": "C", "segment_text": "good", "do_not_label_as": "Setting"},
+        ]
+        rendered = prompting.format_negative_examples(examples)
+        self.assertIn('Segment: "good"', rendered)
+        self.assertIn("Do NOT label this segment as: Setting", rendered)
+        # Malformed entries should not produce stray "Segment:" lines
+        self.assertEqual(rendered.count("Segment:"), 1)
+
+    def test_build_multi_label_prompt_includes_negative_examples(self):
+        """The ${negative_examples} placeholder should be populated when examples are given."""
+        examples = [
+            {
+                "sentence": "S",
+                "segment_text": "seg",
+                "do_not_label_as": "LabelA",
+            }
+        ]
+        template = "SENTENCE: ${sentence}\nCATS:\n${categories}\nNEG:\n${negative_examples}"
+        prompt = prompting.build_multi_label_prompt(
+            "S", ["LabelA", "LabelB"], template, negative_examples=examples,
+        )
+        self.assertIn("SENTENCE: S", prompt)
+        self.assertIn('Segment: "seg"', prompt)
+        self.assertIn("Do NOT label this segment as: LabelA", prompt)
+
+    def test_build_multi_label_prompt_default_template_when_none(self):
+        """Passing prompt_template=None should fall back to the bundled multi-label default."""
+        prompt = prompting.build_multi_label_prompt("S", ["A", "B"], None)
+        self.assertIn('Sentence: "S"', prompt)
+        self.assertIn("0 A", prompt)
+        self.assertIn("1 B", prompt)
+
+    def test_build_prompt_negative_examples_via_template(self):
+        """Single-label build_prompt should also fill ${negative_examples} if present in template."""
+        template = "${sentence}\n${categories}\nNEG:${negative_examples}"
+        examples = [{"sentence": "S", "segment_text": "x", "do_not_label_as": "Y"}]
+        prompt = prompting.build_prompt(["seg"], ["Cat"], template, negative_examples=examples)
+        self.assertIn('Segment: "x"', prompt)
+        self.assertIn("Do NOT label this segment as: Y", prompt)
+
+
 class CategoryParsingTests(unittest.TestCase):
     """Tests for category JSON parsing and description extraction."""
 
@@ -234,6 +309,76 @@ class CLITests(unittest.TestCase):
 
         called_desc = mock_find.call_args[0][4]
         self.assertEqual(called_desc, "Test desc")
+
+    def test_main_loads_negative_examples_file(self):
+        """--negative-examples should load a JSON file and pass its contents through."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cats_path = os.path.join(tmpdir, "cats.json")
+            neg_path = os.path.join(tmpdir, "neg.json")
+            with open(cats_path, "w") as handle:
+                json.dump({"labels": {"0": "A"}}, handle)
+            with open(neg_path, "w") as handle:
+                json.dump(
+                    [
+                        {
+                            "sentence": "S",
+                            "segment_text": "seg",
+                            "do_not_label_as": "A",
+                        }
+                    ],
+                    handle,
+                )
+
+            argv = [
+                "label-phrase",
+                '["seg"]',
+                "test-key",
+                "--override-categories", cats_path,
+                "--negative-examples", neg_path,
+            ]
+            with mock.patch.object(sys, "argv", argv):
+                with mock.patch.object(cli, "find_labels") as mock_find:
+                    cli.main()
+
+        kwargs = mock_find.call_args.kwargs
+        self.assertIn("negative_examples", kwargs)
+        self.assertEqual(len(kwargs["negative_examples"]), 1)
+        self.assertEqual(kwargs["negative_examples"][0]["do_not_label_as"], "A")
+
+    def test_main_multi_label_passes_negative_examples(self):
+        """--multi-label + --negative-examples should pipe through to find_labels_multi."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cats_path = os.path.join(tmpdir, "cats.json")
+            neg_path = os.path.join(tmpdir, "neg.json")
+            with open(cats_path, "w") as handle:
+                json.dump({"labels": {"0": "A"}}, handle)
+            with open(neg_path, "w") as handle:
+                json.dump(
+                    [
+                        {
+                            "sentence": "S",
+                            "segment_text": "seg",
+                            "do_not_label_as": "A",
+                        }
+                    ],
+                    handle,
+                )
+
+            argv = [
+                "label-phrase",
+                "The raw sentence.",
+                "test-key",
+                "--multi-label",
+                "--override-categories", cats_path,
+                "--negative-examples", neg_path,
+            ]
+            with mock.patch.object(sys, "argv", argv):
+                with mock.patch.object(cli, "find_labels_multi", return_value=[]) as mock_multi:
+                    cli.main()
+
+        kwargs = mock_multi.call_args.kwargs
+        self.assertEqual(len(kwargs["negative_examples"]), 1)
+        self.assertEqual(kwargs["negative_examples"][0]["segment_text"], "seg")
 
     def test_main_uses_prompt_file(self):
         """Load the prompt template from the provided file."""
