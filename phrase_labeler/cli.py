@@ -156,7 +156,7 @@ def find_labels(
     Parameters
     ----------
     model : str, optional
-        OpenAI model name. Defaults to gpt-3.5-turbo when not provided.
+        OpenAI model name. Defaults to gpt-5-mini when not provided.
     temperature : float, optional
         Sampling temperature. Ignored when reasoning_effort is set.
     reasoning_effort : str, optional

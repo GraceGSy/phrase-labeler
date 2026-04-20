@@ -32,7 +32,7 @@ def call_chatgpt(
     prompt: str,
     n: int = 1,
     temperature: float = 1.0,
-    model: str = "gpt-3.5-turbo",
+    model: str = "gpt-5-mini",
     reasoning_effort: str | None = None,
 ) -> Tuple[Dict, Dict]:
     """Send a prompt to the ChatGPT API and return the query and response objects."""
