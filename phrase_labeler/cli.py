@@ -18,7 +18,7 @@ from .prompting import (
 )
 
 
-TEMPERATURE = 0.2 #The temperature for ChatGPT calls
+TEMPERATURE = None  # Let the model use its own default; some models reject non-default values
 
 
 def _load_prompt_template(prompt_file: Optional[str]) -> Optional[str]:
