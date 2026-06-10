@@ -1,0 +1,46 @@
+{
+  "dataset_path": "tests/data.json",
+  "output_dir": "eval_runs",
+  "run_name": "baseline_eval",
+  "match_mode": "exact",
+  "label_sets": {
+    "need-thesis": {
+      "path": "categories/need.json"
+    },
+    "approach-thesis": {
+      "path": "categories/approach.json"
+    },
+    "novelty-thesis": {
+      "path": "categories/novelty.json"
+    }
+  },
+  "prompt_sets": [
+    {
+      "name": "default",
+      "path": "prompts/default.txt"
+    }
+  ],
+  "models": [
+    {
+      "name": "gpt-4.1-mini",
+      "model": "gpt-4.1-mini",
+      "temperature": 0.2,
+      "reasoning_effort": null,
+      "n": 1
+    }
+  ],
+  "judge": {
+    "enabled": false,
+    "mode": "correct_labels",
+    "prompt_path": "prompts/judge/correct-labels.txt",
+    "system_prompt": null,
+    "fallback_to_base_on_error": true,
+    "model": {
+      "name": "gpt-4.1-mini-judge",
+      "model": "gpt-4.1-mini",
+      "temperature": null,
+      "reasoning_effort": null,
+      "n": 1
+    }
+  }
+}

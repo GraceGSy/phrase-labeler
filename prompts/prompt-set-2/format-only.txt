@@ -1,0 +1,12 @@
+Classify each segment into exactly one category.
+
+Categories (0..N-1):
+${categories}
+
+Segments:
+${sentence}
+
+Return ONLY a Python list of integers, same length/order as Segments.
+Format example (NOT related to this input): [0, 2, 2, 1]
+
+Output:

@@ -1,0 +1,32 @@
+Task: Assign exactly one category index to each segment.
+
+Rules:
+- Output ONLY a single Python list of integers (no prose, no code fences).
+- The list length MUST equal the number of segments.
+- Each integer MUST be a valid category index from the list above.
+- Choose the single best category for each segment (best guess if uncertain).
+- If a segment does not fit any category well, label it with -1.
+
+Example:
+```
+CATEGORIES (indices 0..N-1):
+0 Stakeholders 
+1 Setting 
+2 Goal 
+3 Obstacle 
+4 Constraints
+
+SEGMENTS (in order):
+["Many people", "when editing visualizations", "find GUIs either too complex or too limited", "which hinders creative exploration","as shown by prior work"]
+
+Output:
+[0,1,3,3,-1]
+```
+
+CATEGORIES (indices 0..N-1):
+${categories}
+
+SEGMENTS (in order):
+${sentence}
+
+Output:

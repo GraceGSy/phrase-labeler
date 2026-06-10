@@ -1,0 +1,13 @@
+Assign one category to each segment based on its primary meaning.
+
+Categories:
+${categories}
+
+Segments:
+${sentence}
+
+Tie-break rule:
+If a segment could fit multiple categories, pick the category that matches the segment’s main contribution to the sentence (not incidental details).
+
+Output ONLY a Python list of integers, one per segment, same order.
+Output:

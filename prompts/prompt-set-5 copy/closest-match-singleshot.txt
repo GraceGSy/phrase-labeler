@@ -1,0 +1,32 @@
+Assign one category to each segment based on its primary meaning.
+
+Tie-break rule:
+If a segment could fit multiple categories, pick the category that matches the segment’s main contribution to the sentence (not incidental details).
+If a segment does not fit any category well, label it with -1.
+
+Output ONLY a Python list of integers, one per segment, same order.
+
+Below is a difficult example with expected output.
+```example
+
+Categories:
+0 Stakeholders 
+1 Setting 
+2 Goal 
+3 Obstacle 
+4 Constraints
+
+Segments:
+["Many people", "when editing visualizations", "find GUIs either too complex or too limited", "which hinders creative exploration", "as shown by prior work"]
+
+Output:
+[0,1,3,3,-1]
+```
+
+Categories:
+${categories}
+
+Segments:
+${sentence}
+
+Output:

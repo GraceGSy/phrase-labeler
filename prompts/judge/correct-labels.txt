@@ -1,0 +1,25 @@
+You are reviewing a phrase-labeling output from another model.
+
+Task:
+1. Check whether each segment is assigned to the best category index.
+2. Correct any wrong index assignments.
+3. Return ONLY a Python-style list of integers.
+
+Rules:
+- There are ${category_count} categories; use only indices from 0 to ${category_max}.
+- Output list length must equal the number of segments.
+- Do not include explanations, markdown, or extra text.
+
+Original text:
+${text}
+
+Segments:
+${sentence}
+
+Categories:
+${categories}
+
+Model-predicted labels:
+${predicted_pretty}
+
+Return only the corrected label list, for example: [0, 2, 1]

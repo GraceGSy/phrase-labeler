@@ -1,2 +1,0 @@
-[console_scripts]
-label-phrase = phrase_labeler.phrase_labeler:main

@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "phrase-labeler"
+version = "0.2.0"
+description = "Label sentence fragments with overlapping semantic categories using the OpenAI API. Supports custom taxonomies and user-supplied negative examples."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "openai>=1.0.0",
+]
+authors = [
+  { name = "Ziwei Gu", email = "ziweigu@g.harvard.edu" },
+  { name = "Kanishk Tantia", email = "ktantia@g.harvard.edu" }
+]
+license = { file = "LICENSE" }
+keywords = ["nlp", "llm", "openai", "classification", "labeling", "text-analysis"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+  "Topic :: Text Processing :: Linguistic",
+]
+
+[project.urls]
+Homepage = "https://github.com/ZiweiGu/Typical-phrase-labeler"
+Repository = "https://github.com/ZiweiGu/Typical-phrase-labeler"
+Issues = "https://github.com/ZiweiGu/Typical-phrase-labeler/issues"
+
+[project.scripts]
+label-phrase = "phrase_labeler.cli:main"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["phrase_labeler", "phrase_labeler.*"]
