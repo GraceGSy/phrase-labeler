@@ -31,7 +31,7 @@ class LLM(Enum):
 def call_chatgpt(
     prompt: str,
     n: int = 1,
-    temperature: float = 1.0,
+    temperature: float | None = None,
     model: str = "gpt-5-mini",
     reasoning_effort: str | None = None,
 ) -> Tuple[Dict, Dict]:
@@ -44,10 +44,11 @@ def call_chatgpt(
         ],
         "n": n,
     }
-    # Reasoning models don't support temperature; only set it for non-reasoning calls
+    # Only set temperature when explicitly requested; some models (e.g. gpt-5-mini)
+    # reject any value other than the default (1). Reasoning models ignore it entirely.
     if reasoning_effort is not None:
         query["reasoning_effort"] = reasoning_effort
-    else:
+    elif temperature is not None:
         query["temperature"] = temperature
 
     client = OpenAI(api_key=openai.api_key)
@@ -129,7 +130,7 @@ class PromptPipeline:
         properties,
         llm: LLM,
         n: int = 1,
-        temperature: float = 1.0,
+        temperature: float | None = None,
         model: str | None = None,
         reasoning_effort: str | None = None,
     ) -> Iterator[Dict]:
@@ -224,7 +225,7 @@ class PromptPipeline:
         llm: LLM,
         prompt: str,
         n: int = 1,
-        temperature: float = 1.0,
+        temperature: float | None = None,
         model: str | None = None,
         reasoning_effort: str | None = None,
     ) -> Tuple[Dict, Dict]:
