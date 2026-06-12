@@ -13,6 +13,7 @@ from .prompting import (
     DEFAULT_CATEGORIES,
     DEFAULT_MULTI_LABEL_PROMPT_TEMPLATE,
     DEFAULT_PROMPT_TEMPLATE,
+    build_batch_multi_label_prompt,
     build_multi_label_prompt,
     build_prompt,
 )
@@ -260,6 +261,108 @@ def find_labels_multi(
     raw_spans = _parse_multi_label_response(tmp[0])
     resolved = _resolve_spans(sentence, raw_spans)
     return resolved
+
+
+def _parse_batch_multi_label_response(raw_text: str) -> list[dict]:
+    """Parse a batch LLM response into a list of span dicts with sentence_index."""
+    cleaned = _strip_code_fences(raw_text)
+    start = cleaned.find("[")
+    end = cleaned.rfind("]")
+    if start != -1 and end != -1 and end > start:
+        cleaned = cleaned[start:end + 1]
+
+    spans = json.loads(cleaned)
+    if not isinstance(spans, list):
+        raise ValueError("Expected a JSON array of span objects.")
+
+    result = []
+    for span in spans:
+        if not isinstance(span, dict):
+            raise ValueError(f"Expected span object, got {type(span)}")
+        sentence_index = span.get("sentence_index", 0)
+        text = span.get("text", "")
+        context = span.get("context", text)
+        label = span.get("label", -1)
+        if not isinstance(label, int):
+            label = int(label)
+        if not isinstance(sentence_index, int):
+            sentence_index = int(sentence_index)
+        result.append({
+            "sentence_index": sentence_index,
+            "text": text,
+            "context": context,
+            "label": label,
+        })
+    return result
+
+
+def find_labels_multi_batch(
+    sentences: list[str],
+    api_key: str,
+    categories: list[str],
+    prompt_template: Optional[str] = None,
+    description: str = "",
+    model: Optional[str] = None,
+    temperature: Optional[float] = None,
+    reasoning_effort: Optional[str] = None,
+    category_descriptions: list[str] | None = None,
+    negative_examples: Optional[list[dict]] = None,
+) -> list[list[dict]]:
+    """Classify multiple sentences in a single OpenAI call.
+
+    Sentences are embedded as XML tags in one prompt, so only one API call is
+    made regardless of how many sentences there are. Results are returned as a
+    list parallel to the input: result[i] contains the resolved spans for
+    sentences[i].
+
+    Returns
+    -------
+    list[list[dict]]
+        One list of span dicts per input sentence.
+        Each dict has: text (str), label (int), start (int), end (int).
+    """
+    if not sentences:
+        return []
+
+    openai.api_key = api_key
+    if temperature is None:
+        temperature = TEMPERATURE
+
+    filled_prompt = build_batch_multi_label_prompt(
+        sentences, categories, prompt_template, description,
+        category_descriptions=category_descriptions,
+        negative_examples=negative_examples,
+    )
+
+    # Phrase_TaggerPromptPipeline.gen_prompts substitutes ${sentence} from
+    # properties; the batch template has no such placeholder, so the value is
+    # unused — pass a dummy string to satisfy the dict access.
+    phrase_tagger = Phrase_TaggerPromptPipeline(filled_prompt)
+    tmp = []
+    phrase_tagger.clear_cached_responses()
+    for res in phrase_tagger.gen_responses(
+        {"sentence": "__batch__"},
+        LLM.ChatGPT,
+        n=1,
+        temperature=temperature,
+        model=model,
+        reasoning_effort=reasoning_effort,
+    ):
+        tmp.extend(extract_responses(res, llm=LLM.ChatGPT))
+
+    if not tmp:
+        raise ValueError("No response returned from model.")
+
+    raw_spans = _parse_batch_multi_label_response(tmp[0])
+
+    # Group spans by sentence_index
+    groups: list[list[dict]] = [[] for _ in sentences]
+    for span in raw_spans:
+        idx = span["sentence_index"]
+        if 0 <= idx < len(sentences):
+            groups[idx].append(span)
+
+    return [_resolve_spans(sentences[i], groups[i]) for i in range(len(sentences))]
 
 
 def main():
