@@ -310,6 +310,94 @@ def build_prompt(
     })
 
 
+DEFAULT_BATCH_MULTI_LABEL_PROMPT_TEMPLATE = """You are an expert in linguistics and natural language processing with decades of experience analyzing academic writing.
+
+Given a set of sentences from paper abstracts and a set of category labels, identify all meaningful text fragments in each sentence and classify each fragment into exactly one category. Fragments may overlap — the same words can appear in multiple fragments with different labels.
+
+For each fragment, return a JSON object with:
+- "sentence_index": the integer id of the sentence this fragment belongs to (matches the id attribute in the XML tag)
+- "text": the exact substring from that sentence being labeled
+- "context": a longer surrounding substring that uniquely identifies where this fragment appears in the sentence
+- "label": the category number (integer) that best describes this fragment
+
+If a portion of a sentence does not fit any category, include it with label -1.
+
+Return a single JSON array containing all span objects across all sentences. Every word in every sentence should be covered by at least one fragment.
+
+${description}
+
+## Example
+
+Sentences:
+<sentence id="0">DynaVis addresses this challenge by blending natural language input with dynamically generated widgets that allow users to refine edits.</sentence>
+<sentence id="1">In this paper, we present a novel clustering algorithm for large-scale datasets.</sentence>
+
+Categories:
+0 Artifact
+1 Method
+2 Contribution
+
+Output:
+```json
+[
+  {"sentence_index": 0, "text": "DynaVis", "context": "DynaVis addresses this challenge", "label": 0},
+  {"sentence_index": 0, "text": "addresses this challenge", "context": "DynaVis addresses this challenge by", "label": 2},
+  {"sentence_index": 0, "text": "by blending natural language input", "context": "challenge by blending natural language input with", "label": 1},
+  {"sentence_index": 0, "text": "with dynamically generated widgets", "context": "input with dynamically generated widgets that", "label": 0},
+  {"sentence_index": 0, "text": "that allow users to refine edits", "context": "widgets that allow users to refine edits", "label": 2},
+  {"sentence_index": 1, "text": "In this paper,", "context": "In this paper, we present", "label": -1},
+  {"sentence_index": 1, "text": "we present", "context": "this paper, we present a novel", "label": -1},
+  {"sentence_index": 1, "text": "a novel clustering algorithm", "context": "present a novel clustering algorithm for", "label": 0},
+  {"sentence_index": 1, "text": "for large-scale datasets", "context": "algorithm for large-scale datasets", "label": -1}
+]
+```
+
+${negative_examples}
+---
+
+Now classify the following sentences:
+
+${sentences}
+
+Categories:
+${categories}
+
+Output:"""
+
+
+def build_batch_multi_label_prompt(
+    sentences: list[str],
+    categories: list[str],
+    prompt_template: str | None = None,
+    description: str = "",
+    category_descriptions: list[str] | None = None,
+    negative_examples: list[dict] | None = None,
+) -> str:
+    """Construct a batch multi-label prompt for multiple sentences in one call.
+
+    Sentences are embedded as XML tags (<sentence id="N">...</sentence>) so
+    the model can unambiguously identify which sentence each span belongs to,
+    without conflicting with academic citation formats like [0] or [1].
+    """
+    if prompt_template is None:
+        prompt_template = DEFAULT_BATCH_MULTI_LABEL_PROMPT_TEMPLATE
+
+    sentences_xml = "\n".join(
+        f'<sentence id="{i}">{s}</sentence>'
+        for i, s in enumerate(sentences)
+    )
+    category_text = format_categories(categories, category_descriptions)
+    negative_text = format_negative_examples(negative_examples)
+
+    return Template(prompt_template).safe_substitute({
+        "sentences": sentences_xml,
+        "categories": category_text,
+        "category_count": len(categories),
+        "description": description,
+        "negative_examples": negative_text,
+    })
+
+
 def build_multi_label_prompt(
     sentence: str,
     categories: list[str],

@@ -5,7 +5,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 from phrase_labeler.categories import load_categories
-from phrase_labeler.cli import find_labels, find_labels_multi
+from phrase_labeler.cli import find_labels, find_labels_multi, find_labels_multi_batch
 from phrase_labeler.prompting import DEFAULT_CATEGORIES
 
 app = FastAPI(title="Phrase Labeler API", version="0.2.0")
@@ -37,6 +37,17 @@ class LabelRequest(BaseModel):
 
 class MultiLabelRequest(BaseModel):
     sentence: str
+    categories: Optional[list[str]] = None
+    description: str = ""
+    model: Optional[str] = None
+    temperature: Optional[float] = None
+    reasoning_effort: Optional[str] = None
+    category_descriptions: Optional[list[str]] = None
+    negative_examples: Optional[list[dict]] = None
+
+
+class BatchMultiLabelRequest(BaseModel):
+    sentences: list[str]
     categories: Optional[list[str]] = None
     description: str = ""
     model: Optional[str] = None
@@ -86,3 +97,22 @@ def label_multi(req: MultiLabelRequest):
         negative_examples=req.negative_examples or [],
     )
     return {"spans": result}
+
+
+@app.post("/label-multi-batch")
+def label_multi_batch(req: BatchMultiLabelRequest):
+    """Classify multiple sentences into overlapping spans in a single OpenAI call."""
+    api_key = _get_api_key()
+    cats, desc = _resolve_categories(req.categories, req.description)
+    results = find_labels_multi_batch(
+        req.sentences,
+        api_key,
+        cats,
+        description=desc,
+        model=req.model,
+        temperature=req.temperature,
+        reasoning_effort=req.reasoning_effort,
+        category_descriptions=req.category_descriptions,
+        negative_examples=req.negative_examples or [],
+    )
+    return {"results": [{"spans": spans} for spans in results]}
