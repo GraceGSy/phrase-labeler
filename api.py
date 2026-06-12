@@ -1,4 +1,5 @@
 import os
+import traceback
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException
@@ -104,15 +105,20 @@ def label_multi_batch(req: BatchMultiLabelRequest):
     """Classify multiple sentences into overlapping spans in a single OpenAI call."""
     api_key = _get_api_key()
     cats, desc = _resolve_categories(req.categories, req.description)
-    results = find_labels_multi_batch(
-        req.sentences,
-        api_key,
-        cats,
-        description=desc,
-        model=req.model,
-        temperature=req.temperature,
-        reasoning_effort=req.reasoning_effort,
-        category_descriptions=req.category_descriptions,
-        negative_examples=req.negative_examples or [],
-    )
-    return {"results": [{"spans": spans} for spans in results]}
+    try:
+        results = find_labels_multi_batch(
+            req.sentences,
+            api_key,
+            cats,
+            description=desc,
+            model=req.model,
+            temperature=req.temperature,
+            reasoning_effort=req.reasoning_effort,
+            category_descriptions=req.category_descriptions,
+            negative_examples=req.negative_examples or [],
+        )
+        return {"results": [{"spans": spans} for spans in results]}
+    except Exception as e:
+        tb = traceback.format_exc()
+        print(tb)
+        raise HTTPException(status_code=500, detail=f"{type(e).__name__}: {e}\n\n{tb}")
