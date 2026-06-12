@@ -8,7 +8,7 @@ from typing import Optional
 import openai
 
 from .categories import load_categories
-from .pipeline import LLM, Phrase_TaggerPromptPipeline, extract_responses
+from .pipeline import LLM, Phrase_TaggerPromptPipeline, call_chatgpt, extract_responses
 from .prompting import (
     DEFAULT_CATEGORIES,
     DEFAULT_MULTI_LABEL_PROMPT_TEMPLATE,
@@ -334,26 +334,23 @@ def find_labels_multi_batch(
         negative_examples=negative_examples,
     )
 
-    # Phrase_TaggerPromptPipeline.gen_prompts substitutes ${sentence} from
-    # properties; the batch template has no such placeholder, so the value is
-    # unused — pass a dummy string to satisfy the dict access.
-    phrase_tagger = Phrase_TaggerPromptPipeline(filled_prompt)
-    tmp = []
-    phrase_tagger.clear_cached_responses()
-    for res in phrase_tagger.gen_responses(
-        {"sentence": "__batch__"},
-        LLM.ChatGPT,
-        n=1,
-        temperature=temperature,
-        model=model,
-        reasoning_effort=reasoning_effort,
-    ):
-        tmp.extend(extract_responses(res, llm=LLM.ChatGPT))
-
-    if not tmp:
+    # Call the model directly — bypassing Phrase_TaggerPromptPipeline so that
+    # the filled prompt is never re-processed as a Template. Annotation text
+    # may contain bare $ characters (dollar amounts, LaTeX) that would cause
+    # Template.substitute to raise ValueError.
+    chatgpt_kwargs: dict = {"n": 1}
+    if model is not None:
+        chatgpt_kwargs["model"] = model
+    if temperature is not None:
+        chatgpt_kwargs["temperature"] = temperature
+    if reasoning_effort is not None:
+        chatgpt_kwargs["reasoning_effort"] = reasoning_effort
+    _, response = call_chatgpt(filled_prompt, **chatgpt_kwargs)
+    raw_text = response.choices[0].message.content
+    if not raw_text:
         raise ValueError("No response returned from model.")
 
-    raw_spans = _parse_batch_multi_label_response(tmp[0])
+    raw_spans = _parse_batch_multi_label_response(raw_text)
 
     # Group spans by sentence_index
     groups: list[list[dict]] = [[] for _ in sentences]
