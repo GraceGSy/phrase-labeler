@@ -19,6 +19,13 @@ def _get_api_key() -> str:
     return key
 
 
+def _get_anthropic_api_key() -> str:
+    key = os.environ.get("ANTHROPIC_API_KEY", "")
+    if not key:
+        raise HTTPException(status_code=500, detail="ANTHROPIC_API_KEY is not configured on the server.")
+    return key
+
+
 def _resolve_categories(categories: list[str] | None, description: str) -> tuple[list[str], str]:
     if categories:
         return categories, description
@@ -45,6 +52,7 @@ class MultiLabelRequest(BaseModel):
     reasoning_effort: Optional[str] = None
     category_descriptions: Optional[list[str]] = None
     negative_examples: Optional[list[dict]] = None
+    provider: Optional[str] = None
 
 
 class BatchMultiLabelRequest(BaseModel):
@@ -56,6 +64,16 @@ class BatchMultiLabelRequest(BaseModel):
     reasoning_effort: Optional[str] = None
     category_descriptions: Optional[list[str]] = None
     negative_examples: Optional[list[dict]] = None
+    provider: Optional[str] = None
+
+
+def _resolve_provider(requested: Optional[str], model: Optional[str]) -> str:
+    """Return 'anthropic' or 'openai', auto-detecting from model name if not explicit."""
+    if requested:
+        return requested.lower()
+    if model and not model.startswith("claude-"):
+        return "openai"
+    return "anthropic"
 
 
 @app.get("/health")
@@ -84,7 +102,9 @@ def label(req: LabelRequest):
 @app.post("/label-multi")
 def label_multi(req: MultiLabelRequest):
     """Classify a raw sentence into overlapping labeled spans (multi-label mode)."""
-    api_key = _get_api_key()
+    provider = _resolve_provider(req.provider, req.model)
+    api_key = _get_api_key() if provider != "anthropic" else ""
+    anthropic_api_key = _get_anthropic_api_key() if provider == "anthropic" else None
     cats, desc = _resolve_categories(req.categories, req.description)
     result = find_labels_multi(
         req.sentence,
@@ -96,14 +116,18 @@ def label_multi(req: MultiLabelRequest):
         reasoning_effort=req.reasoning_effort,
         category_descriptions=req.category_descriptions,
         negative_examples=req.negative_examples or [],
+        provider=provider,
+        anthropic_api_key=anthropic_api_key,
     )
     return {"spans": result}
 
 
 @app.post("/label-multi-batch")
 def label_multi_batch(req: BatchMultiLabelRequest):
-    """Classify multiple sentences into overlapping spans in a single OpenAI call."""
-    api_key = _get_api_key()
+    """Classify multiple sentences into overlapping spans in a single LLM call."""
+    provider = _resolve_provider(req.provider, req.model)
+    api_key = _get_api_key() if provider != "anthropic" else ""
+    anthropic_api_key = _get_anthropic_api_key() if provider == "anthropic" else None
     cats, desc = _resolve_categories(req.categories, req.description)
     try:
         results = find_labels_multi_batch(
@@ -116,6 +140,8 @@ def label_multi_batch(req: BatchMultiLabelRequest):
             reasoning_effort=req.reasoning_effort,
             category_descriptions=req.category_descriptions,
             negative_examples=req.negative_examples or [],
+            provider=provider,
+            anthropic_api_key=anthropic_api_key,
         )
         return {"results": [{"spans": spans} for spans in results]}
     except Exception as e:

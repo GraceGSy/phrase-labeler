@@ -9,6 +9,27 @@ import unittest
 from contextlib import redirect_stdout
 from unittest import mock
 
+# Load OPENAI_API_KEY from the repo .env if not already in the environment
+_env_path = os.path.join(os.path.dirname(__file__), "..", ".env")
+if os.path.exists(_env_path):
+    with open(_env_path) as _fh:
+        for _line in _fh:
+            _line = _line.strip()
+            if "=" in _line and not _line.startswith("#"):
+                _k, _v = _line.split("=", 1)
+                os.environ.setdefault(_k.strip(), _v.strip())
+
+_OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
+_requires_openai = unittest.skipUnless(_OPENAI_API_KEY, "OPENAI_API_KEY not set")
+
+_ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+_requires_anthropic = unittest.skipUnless(_ANTHROPIC_API_KEY, "ANTHROPIC_API_KEY not set")
+
+try:
+    import openai  # load the real package before the stub guard runs
+except ImportError:
+    pass
+
 if "openai" not in sys.modules:
     fake_openai = types.ModuleType("openai")
 
@@ -398,6 +419,151 @@ class CLITests(unittest.TestCase):
             mock_find.assert_called_once()
             called_prompt = mock_find.call_args[0][3]
             self.assertEqual(called_prompt, "Prompt: ${sentence}\n${categories}")
+
+
+_SUGGEST_CATEGORIES_PROMPT_PATH = os.path.join(
+    os.path.dirname(__file__), "..", "prompts", "suggest-categories", "system_prompt.txt"
+)
+with open(_SUGGEST_CATEGORIES_PROMPT_PATH) as _fh:
+    SUGGEST_CATEGORIES_SYSTEM_PROMPT = _fh.read().strip()
+
+
+def _build_suggest_categories_user_message(segments: list[str]) -> str:
+    lines = "\n".join(f"- {seg}" for seg in segments)
+    return f"Text segments:\n{lines}\n\nReturn a JSON array of category label strings."
+
+
+def _call_suggest_categories(segments: list[str], api_key: str) -> list[str]:
+    """Send the category-suggestion prompt to OpenAI and return the parsed label list."""
+    from openai import OpenAI
+    client = OpenAI(api_key=api_key)
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": SUGGEST_CATEGORIES_SYSTEM_PROMPT},
+            {"role": "user", "content": _build_suggest_categories_user_message(segments)},
+        ],
+    )
+    content = response.choices[0].message.content.strip()
+    # Strip optional markdown code fences the model sometimes adds
+    if content.startswith("```"):
+        content = content.split("\n", 1)[1].rsplit("```", 1)[0]
+    return json.loads(content.strip())
+
+
+class SuggestCategoriesPromptTests(unittest.TestCase):
+    """Tests for a prompt that suggests meaningful category labels from text segments."""
+
+    _SAMPLE_PATH = os.path.join(
+        os.path.dirname(__file__), "..", "examples", "sample_negative_examples.json"
+    )
+
+    def _load_field(self, field: str) -> list[str]:
+        with open(self._SAMPLE_PATH) as fh:
+            return [ex[field] for ex in json.load(fh)]
+
+    def test_system_prompt_contains_expert_framing(self):
+        """System prompt must include the expert role and category-suggestion task."""
+        self.assertIn("expert in linguistics", SUGGEST_CATEGORIES_SYSTEM_PROMPT)
+        self.assertIn("category labels", SUGGEST_CATEGORIES_SYSTEM_PROMPT)
+        self.assertIn("shared/repeated between text segments", SUGGEST_CATEGORIES_SYSTEM_PROMPT)
+
+    def test_user_message_contains_all_segment_texts(self):
+        """User message must include every segment_text from the sample file."""
+        segments = self._load_field("segment_text")
+        msg = _build_suggest_categories_user_message(segments)
+        for seg in segments:
+            self.assertIn(seg, msg)
+
+    def test_user_message_contains_all_sentences(self):
+        """User message built from full sentences must contain each sentence."""
+        sentences = self._load_field("sentence")
+        msg = _build_suggest_categories_user_message(sentences)
+        for sent in sentences:
+            self.assertIn(sent, msg)
+
+    @_requires_openai
+    def test_real_api_suggests_categories_from_segment_texts(self):
+        """Real OpenAI call with segment_text inputs should return a non-empty list of dicts."""
+        segments = self._load_field("segment_text")
+        result = _call_suggest_categories(segments, _OPENAI_API_KEY)
+        self.assertIsInstance(result, list)
+        self.assertGreater(len(result), 0)
+        for item in result:
+            self.assertIsInstance(item, dict)
+            self.assertIn("label", item)
+            self.assertIn("description", item)
+            self.assertIsInstance(item["label"], str)
+            self.assertIsInstance(item["description"], str)
+            self.assertTrue(item["label"].strip())
+            self.assertTrue(item["description"].strip())
+
+    @_requires_openai
+    def test_real_api_suggests_categories_from_full_sentences(self):
+        """Real OpenAI call with full sentences should return a non-empty list of dicts."""
+        sentences = self._load_field("sentence")
+        result = _call_suggest_categories(sentences, _OPENAI_API_KEY)
+        self.assertIsInstance(result, list)
+        self.assertGreater(len(result), 0)
+        for item in result:
+            self.assertIsInstance(item, dict)
+            self.assertIn("label", item)
+            self.assertIn("description", item)
+            self.assertIsInstance(item["label"], str)
+            self.assertIsInstance(item["description"], str)
+            self.assertTrue(item["label"].strip())
+            self.assertTrue(item["description"].strip())
+        print("\nSentences:")
+        for s in sentences:
+            print(f"  - {s}")
+        print("\nSuggested categories:")
+        for item in result:
+            print(f"  - {item['label']}: {item['description']}")
+
+
+class ClaudeBatchLabelingTests(unittest.TestCase):
+    """Integration tests for find_labels_multi_batch() using the Claude provider."""
+
+    _SAMPLE_PATH = os.path.join(
+        os.path.dirname(__file__), "..", "examples", "sample_negative_examples.json"
+    )
+    _CATEGORIES = ["Contribution", "Methodology", "Findings", "Background", "Obstacle"]
+
+    def _load_sentences(self) -> list[str]:
+        with open(self._SAMPLE_PATH) as fh:
+            return [ex["sentence"] for ex in json.load(fh)]
+
+    @_requires_anthropic
+    def test_claude_batch_labels_sample_sentences(self):
+        """find_labels_multi_batch() with provider='anthropic' returns spans for each sentence."""
+        sentences = self._load_sentences()
+        results = cli.find_labels_multi_batch(
+            sentences=sentences,
+            api_key="",
+            categories=self._CATEGORIES,
+            provider="anthropic",
+            anthropic_api_key=_ANTHROPIC_API_KEY,
+        )
+
+        print("\n--- Claude batch labeling results ---")
+        for i, (sentence, spans) in enumerate(zip(sentences, results)):
+            print(f"\n[{i}] {sentence}")
+            for span in spans:
+                label_name = self._CATEGORIES[span['label']] if span['label'] < len(self._CATEGORIES) else span['label']
+                print(f"      [{span['start']}:{span['end']}] \"{span['text']}\" → {label_name}")
+        print("--- end ---\n")
+
+        self.assertEqual(len(results), len(sentences))
+        for spans in results:
+            self.assertIsInstance(spans, list)
+            for span in spans:
+                self.assertIn("text", span)
+                self.assertIn("label", span)
+                self.assertIn("start", span)
+                self.assertIn("end", span)
+                self.assertIsInstance(span["label"], int)
+                self.assertGreaterEqual(span["start"], 0)
+                self.assertGreater(span["end"], span["start"])
 
 
 class FindLabelsTests(unittest.TestCase):
