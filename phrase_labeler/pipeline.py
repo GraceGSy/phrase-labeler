@@ -34,6 +34,7 @@ def call_claude(
     model: str = "claude-sonnet-4-6",
     temperature: float | None = None,
     api_key: str | None = None,
+    system: str | None = None,
 ) -> Tuple[Dict, object]:
     """Send a prompt to the Claude API and return the query and response objects."""
     import anthropic
@@ -43,6 +44,8 @@ def call_claude(
         "max_tokens": 4096,
         "messages": [{"role": "user", "content": prompt}],
     }
+    if system is not None:
+        kwargs["system"] = system
     if temperature is not None:
         kwargs["temperature"] = temperature
     response = client.messages.create(**kwargs)

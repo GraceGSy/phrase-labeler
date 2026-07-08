@@ -6,7 +6,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 from phrase_labeler.categories import load_categories
-from phrase_labeler.cli import find_labels, find_labels_multi, find_labels_multi_batch
+from phrase_labeler.cli import find_labels, find_labels_multi, find_labels_multi_batch, suggest_categories
 from phrase_labeler.prompting import DEFAULT_CATEGORIES
 
 app = FastAPI(title="Phrase Labeler API", version="0.2.0")
@@ -64,6 +64,12 @@ class BatchMultiLabelRequest(BaseModel):
     reasoning_effort: Optional[str] = None
     category_descriptions: Optional[list[str]] = None
     negative_examples: Optional[list[dict]] = None
+    provider: Optional[str] = None
+
+
+class SuggestCategoriesRequest(BaseModel):
+    segments: list[str]
+    model: Optional[str] = None
     provider: Optional[str] = None
 
 
@@ -144,6 +150,27 @@ def label_multi_batch(req: BatchMultiLabelRequest):
             anthropic_api_key=anthropic_api_key,
         )
         return {"results": [{"spans": spans} for spans in results]}
+    except Exception as e:
+        tb = traceback.format_exc()
+        print(tb)
+        raise HTTPException(status_code=500, detail=f"{type(e).__name__}: {e}\n\n{tb}")
+
+
+@app.post("/suggest-categories")
+def suggest_categories_endpoint(req: SuggestCategoriesRequest):
+    """Suggest category labels for a list of text segments."""
+    provider = _resolve_provider(req.provider, req.model)
+    api_key = _get_api_key() if provider != "anthropic" else ""
+    anthropic_api_key = _get_anthropic_api_key() if provider == "anthropic" else None
+    try:
+        result = suggest_categories(
+            req.segments,
+            api_key=api_key,
+            model=req.model,
+            provider=provider,
+            anthropic_api_key=anthropic_api_key,
+        )
+        return {"categories": result}
     except Exception as e:
         tb = traceback.format_exc()
         print(tb)
