@@ -21,6 +21,55 @@ from .prompting import (
 
 TEMPERATURE = None  # Let the model use its own default; some models reject non-default values
 
+_SUGGEST_CATEGORIES_PROMPT_PATH = os.path.join(
+    os.path.dirname(__file__), "..", "prompts", "suggest-categories", "system_prompt.txt"
+)
+
+
+def _load_suggest_categories_system_prompt() -> str:
+    with open(_SUGGEST_CATEGORIES_PROMPT_PATH, encoding="utf-8") as fh:
+        return fh.read().strip()
+
+
+def suggest_categories(
+    segments: list[str],
+    api_key: str = "",
+    model: Optional[str] = None,
+    provider: str = "anthropic",
+    anthropic_api_key: Optional[str] = None,
+) -> list[dict]:
+    """Suggest category labels for a list of text segments using an LLM.
+
+    Returns a list of {"label": str, "description": str} dicts.
+    """
+    system_prompt = _load_suggest_categories_system_prompt()
+    lines = "\n".join(f"- {seg}" for seg in segments)
+    user_message = f"Text segments:\n{lines}\n\nReturn a JSON array of category label strings."
+
+    if provider == "anthropic":
+        _, response = call_claude(
+            user_message,
+            model=model or "claude-sonnet-4-6",
+            api_key=anthropic_api_key,
+            system=system_prompt,
+        )
+        raw = response.content[0].text.strip()
+    else:
+        from openai import OpenAI
+        client = OpenAI(api_key=api_key)
+        oai_response = client.chat.completions.create(
+            model=model or "gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message},
+            ],
+        )
+        raw = oai_response.choices[0].message.content.strip()
+
+    if raw.startswith("```"):
+        raw = raw.split("\n", 1)[1].rsplit("```", 1)[0]
+    return json.loads(raw.strip())
+
 
 def _load_prompt_template(prompt_file: Optional[str]) -> Optional[str]:
     """Load a prompt template from disk, or return None to signal the default."""
