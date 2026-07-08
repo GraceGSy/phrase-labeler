@@ -1,6 +1,7 @@
 {
   "dataset_path": "tests/smalldata.json",
   "output_dir": "eval_runs/small_eval",
+  "run_name": "small_eval",
   "match_mode": "exact",
   "concurrency": 1,
   "show_progress": true,
@@ -19,7 +20,7 @@
   "prompt_sets": [
     {
       "name": "default",
-      "path": "prompts/default.txt"
+      "path": "prompts/prompt-set-1/default.txt"
     }
   ],
   "models": [

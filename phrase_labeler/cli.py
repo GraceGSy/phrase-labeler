@@ -8,7 +8,7 @@ from typing import Optional
 import openai
 
 from .categories import load_categories
-from .pipeline import LLM, Phrase_TaggerPromptPipeline, call_chatgpt, extract_responses
+from .pipeline import LLM, Phrase_TaggerPromptPipeline, call_chatgpt, call_claude, extract_responses
 from .prompting import (
     DEFAULT_CATEGORIES,
     DEFAULT_MULTI_LABEL_PROMPT_TEMPLATE,
@@ -212,6 +212,8 @@ def find_labels_multi(
     reasoning_effort: Optional[str] = None,
     category_descriptions: list[str] | None = None,
     negative_examples: Optional[list[dict]] = None,
+    provider: str = "anthropic",
+    anthropic_api_key: Optional[str] = None,
 ) -> list[dict]:
     """Classify a raw sentence into overlapping labeled spans (multi-label API).
 
@@ -233,7 +235,6 @@ def find_labels_multi(
     list[dict]
         Each dict has: text (str), label (int), start (int), end (int).
     """
-    openai.api_key = api_key
     if temperature is None:
         temperature = TEMPERATURE
 
@@ -242,23 +243,37 @@ def find_labels_multi(
         category_descriptions=category_descriptions,
         negative_examples=negative_examples,
     )
-    phrase_tagger = Phrase_TaggerPromptPipeline(filled_prompt)
-    tmp = []
-    phrase_tagger.clear_cached_responses()
-    for res in phrase_tagger.gen_responses(
-        {"sentence": sentence},
-        LLM.ChatGPT,
-        n=1,
-        temperature=temperature,
-        model=model,
-        reasoning_effort=reasoning_effort,
-    ):
-        tmp.extend(extract_responses(res, llm=LLM.ChatGPT))
 
-    if not tmp:
+    if provider == "anthropic":
+        _, response = call_claude(
+            filled_prompt,
+            model=model or "claude-sonnet-4-6",
+            temperature=temperature,
+            api_key=anthropic_api_key,
+        )
+        raw_text = response.content[0].text
+    else:
+        openai.api_key = api_key
+        phrase_tagger = Phrase_TaggerPromptPipeline(filled_prompt)
+        tmp = []
+        phrase_tagger.clear_cached_responses()
+        for res in phrase_tagger.gen_responses(
+            {"sentence": sentence},
+            LLM.ChatGPT,
+            n=1,
+            temperature=temperature,
+            model=model,
+            reasoning_effort=reasoning_effort,
+        ):
+            tmp.extend(extract_responses(res, llm=LLM.ChatGPT))
+        if not tmp:
+            raise ValueError("No response returned from model.")
+        raw_text = tmp[0]
+
+    if not raw_text:
         raise ValueError("No response returned from model.")
 
-    raw_spans = _parse_multi_label_response(tmp[0])
+    raw_spans = _parse_multi_label_response(raw_text)
     resolved = _resolve_spans(sentence, raw_spans)
     return resolved
 
@@ -307,6 +322,8 @@ def find_labels_multi_batch(
     reasoning_effort: Optional[str] = None,
     category_descriptions: list[str] | None = None,
     negative_examples: Optional[list[dict]] = None,
+    provider: str = "anthropic",
+    anthropic_api_key: Optional[str] = None,
 ) -> list[list[dict]]:
     """Classify multiple sentences in a single OpenAI call.
 
@@ -324,7 +341,6 @@ def find_labels_multi_batch(
     if not sentences:
         return []
 
-    openai.api_key = api_key
     if temperature is None:
         temperature = TEMPERATURE
 
@@ -338,15 +354,25 @@ def find_labels_multi_batch(
     # the filled prompt is never re-processed as a Template. Annotation text
     # may contain bare $ characters (dollar amounts, LaTeX) that would cause
     # Template.substitute to raise ValueError.
-    chatgpt_kwargs: dict = {"n": 1}
-    if model is not None:
-        chatgpt_kwargs["model"] = model
-    if temperature is not None:
-        chatgpt_kwargs["temperature"] = temperature
-    if reasoning_effort is not None:
-        chatgpt_kwargs["reasoning_effort"] = reasoning_effort
-    _, response = call_chatgpt(filled_prompt, **chatgpt_kwargs)
-    raw_text = response.choices[0].message.content
+    if provider == "anthropic":
+        _, response = call_claude(
+            filled_prompt,
+            model=model or "claude-sonnet-4-6",
+            temperature=temperature,
+            api_key=anthropic_api_key,
+        )
+        raw_text = response.content[0].text
+    else:
+        openai.api_key = api_key
+        chatgpt_kwargs: dict = {"n": 1}
+        if model is not None:
+            chatgpt_kwargs["model"] = model
+        if temperature is not None:
+            chatgpt_kwargs["temperature"] = temperature
+        if reasoning_effort is not None:
+            chatgpt_kwargs["reasoning_effort"] = reasoning_effort
+        _, response = call_chatgpt(filled_prompt, **chatgpt_kwargs)
+        raw_text = response.choices[0].message.content
     if not raw_text:
         raise ValueError("No response returned from model.")
 

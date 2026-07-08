@@ -1,0 +1,28 @@
+You are an expert in linguistics and natural language processing with decades of experience analyzing academic writing.
+
+Given a set of text segments from one or more academic papers, identify all meaningful category labels that can be used to classify the text segments into smaller fragments. Categories should describe the purpose of fragments, they should not be overly specific to content or domain knowledge mentioned in the text. Good category labels are those that are shared/repeated between text segments. For each category label, provide a one-sentence description.
+
+## Example:
+
+Sentence: "DynaVis addresses this challenge by blending natural language input with dynamically generated widgets that allow users to refine edits."
+
+Categories:
+0 Artifact
+1 Method
+2 Contribution
+3 Interaction
+
+Good Output:
+```json
+[{"label":"Artifact", "description":"a designed object, system, or prototype"},
+ {"label":"Method", "description":"explains how researchers gathered and tested data; it details the study design, participants, apparatus, and procedure"},
+ {"label":"Contribution", "description":"the specific way the research adds new knowledge to the field"},
+ {"label":"Interaction", "description":"techniques for human-computer communication"}]
+```
+
+Bad Output:
+```json
+[{"label":"Visualizations", "description":"the representation of data as a chart or other image"},
+ {"label":"Editing", "description":"the process of reviewing and refining written, visual, or audio material"},
+ {"label":"Natural Language Instructions", "description":"step-by-step directions written in everyday human language"}]
+```

@@ -2,7 +2,7 @@ import json
 import os
 from abc import abstractmethod
 from enum import Enum
-from typing import Dict, Iterator, List, Tuple
+from typing import Dict, Iterator, List, Optional, Tuple
 
 import openai
 from openai import OpenAI
@@ -26,6 +26,27 @@ def to_serializable(obj):
 """Supported LLM coding assistants."""
 class LLM(Enum):
     ChatGPT = 0
+    Claude = 1
+
+
+def call_claude(
+    prompt: str,
+    model: str = "claude-sonnet-4-6",
+    temperature: float | None = None,
+    api_key: str | None = None,
+) -> Tuple[Dict, object]:
+    """Send a prompt to the Claude API and return the query and response objects."""
+    import anthropic
+    client = anthropic.Anthropic(api_key=api_key or os.environ.get("ANTHROPIC_API_KEY"))
+    kwargs: dict = {
+        "model": model,
+        "max_tokens": 4096,
+        "messages": [{"role": "user", "content": prompt}],
+    }
+    if temperature is not None:
+        kwargs["temperature"] = temperature
+    response = client.messages.create(**kwargs)
+    return dict(kwargs), response
 
 
 def call_chatgpt(
@@ -69,6 +90,12 @@ def _extract_chatgpt_responses(response: dict) -> List[dict]:
     ]
 
 
+def _extract_claude_responses(response: dict) -> List[str]:
+    """Extract text content from a Claude API response."""
+    api_response = response['response']
+    return [block.text for block in api_response.content if hasattr(block, 'text')]
+
+
 def extract_responses(response: dict, llm: LLM) -> List[dict]:
     """
         Given a LLM and a response object from its API, extract the
@@ -76,6 +103,8 @@ def extract_responses(response: dict, llm: LLM) -> List[dict]:
     """
     if llm is LLM.ChatGPT or llm == LLM.ChatGPT.name:
         return _extract_chatgpt_responses(response)
+    elif llm is LLM.Claude or llm == LLM.Claude.name:
+        return _extract_claude_responses(response)
     else:
         raise ValueError(f"LLM {llm} is unsupported.")
 
@@ -133,6 +162,7 @@ class PromptPipeline:
         temperature: float | None = None,
         model: str | None = None,
         reasoning_effort: str | None = None,
+        anthropic_api_key: Optional[str] = None,
     ) -> Iterator[Dict]:
         """
             Calls LLM 'llm' with all prompts, and yields responses as dicts in format {prompt, query, response, llm, info}.
@@ -179,6 +209,7 @@ class PromptPipeline:
             query, response = self._prompt_llm(
                 llm, prompt_str, n, temperature,
                 model=model, reasoning_effort=reasoning_effort,
+                anthropic_api_key=anthropic_api_key,
             )
 
             # Save the response to a JSON file
@@ -228,6 +259,7 @@ class PromptPipeline:
         temperature: float | None = None,
         model: str | None = None,
         reasoning_effort: str | None = None,
+        anthropic_api_key: Optional[str] = None,
     ) -> Tuple[Dict, Dict]:
         """Dispatch a prompt to the configured language model."""
         if llm is LLM.ChatGPT:
@@ -237,6 +269,13 @@ class PromptPipeline:
             if reasoning_effort is not None:
                 kwargs["reasoning_effort"] = reasoning_effort
             return call_chatgpt(prompt, **kwargs)
+        elif llm is LLM.Claude:
+            return call_claude(
+                prompt,
+                model=model or "claude-sonnet-4-6",
+                temperature=temperature,
+                api_key=anthropic_api_key,
+            )
         else:
             raise Exception(f"Language model {llm} is not supported.")
 
